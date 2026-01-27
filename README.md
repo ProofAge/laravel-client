@@ -27,6 +27,47 @@ PROOFAGE_BASE_URL=https://api.proofage.xyz
 PROOFAGE_VERSION=v1
 ```
 
+## Setup Verification
+
+After configuration, verify your setup using the built-in command:
+
+```bash
+php artisan proofage:verify-setup
+```
+
+### Successful Setup Output
+
+When everything is configured correctly, you should see:
+
+```
+✅ Configuration is valid
+✅ Workspace connection successful
+✅ Webhook URL is configured https://yoursite.com/webhooks/proof-age
+✅ Webhook route found: POST webhooks/proof-age -> App\Http\Controllers\WebhookController@handleProofAgeWebhook
+✅ Webhook route is protected with VerifyWebhookSignature middleware
+✅ ProofAge setup verified successfully!
+```
+
+### What the Command Checks
+
+The verification command ensures:
+
+1. **Configuration** - API keys and base URL are properly set
+2. **Workspace Connection** - Can successfully connect to ProofAge API
+3. **Webhook URL** - Webhook endpoint is configured in your workspace
+4. **Route Existence** - Laravel route exists for the webhook path
+5. **HTTP Method** - Route accepts POST requests
+6. **Security Middleware** - Route is protected with HMAC signature verification
+
+### Troubleshooting
+
+If you see errors about missing middleware, add it to your webhook route:
+
+```php
+Route::post('/webhooks/proof-age', [WebhookController::class, 'handleProofAgeWebhook'])
+    ->middleware('proofage.verify_webhook');
+```
+
 ## Usage
 
 ### Basic Usage
@@ -109,36 +150,6 @@ The middleware:
 3. Generates the expected signature using the same algorithm as ProofAge
 4. Compares signatures using `hash_equals()` for timing-safe comparison
 5. Returns appropriate error responses for invalid requests
-
-### Error Responses
-
-The middleware returns JSON error responses:
-
-```json
-// Missing secret key configuration
-{
-    "error": {
-        "code": "NO_SECRET_KEY_CONFIGURED",
-        "message": "ProofAge secret key is not configured"
-    }
-}
-
-// Missing signature header
-{
-    "error": {
-        "code": "MISSING_SIGNATURE", 
-        "message": "X-HMAC-Signature header is required"
-    }
-}
-
-// Invalid signature
-{
-    "error": {
-        "code": "INVALID_SIGNATURE",
-        "message": "HMAC signature is invalid"
-    }
-}
-```
 
 ## API Methods
 

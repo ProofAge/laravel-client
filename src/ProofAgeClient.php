@@ -2,6 +2,7 @@
 
 namespace ProofAge\Laravel;
 
+use Exception;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -85,34 +86,37 @@ class ProofAgeClient
     protected function initializeHttpClient(): void
     {
         $this->http = Http::timeout($this->config['timeout'])
-            ->retry($this->config['retry_attempts'], $this->config['retry_delay'], function (\Exception $exception, $request) {
+            ->retry(
+                $this->config['retry_attempts'],
+                $this->config['retry_delay'],
+                function (Exception $exception, $request) {
+                    if ($exception instanceof ConnectionException) {
+                        return true;
+                    }
 
-                if ($exception instanceof ConnectionException) {
+                    // Don't retry on 4xx errors except 429 (rate limiting) and others that makes no sense to retry
+                    if ($exception instanceof RequestException) {
+                        $response = $exception->response;
+
+                        if ($response && $response->status() >= 400 && $response->status() < 500) {
+                            // Allow retry only for 429 (Too Many Requests)
+                            return ! in_array(
+                                $response->status(),
+                                [
+                                    SymfonyResponseAlias::HTTP_UNAUTHORIZED,
+                                    SymfonyResponseAlias::HTTP_FORBIDDEN,
+                                    SymfonyResponseAlias::HTTP_NOT_FOUND,
+                                    SymfonyResponseAlias::HTTP_METHOD_NOT_ALLOWED,
+                                    SymfonyResponseAlias::HTTP_TOO_MANY_REQUESTS,
+                                ]
+                            );
+                        }
+                    }
+
+                    // Retry on 5xx errors and network issues
                     return true;
                 }
-
-                // Don't retry on 4xx errors except 429 (rate limiting) and others that makes no sense to retry
-                if ($exception instanceof RequestException) {
-                    $response = $exception->response;
-
-                    if ($response && $response->status() >= 400 && $response->status() < 500) {
-                        // Allow retry only for 429 (Too Many Requests)
-                        return ! in_array(
-                            $response->status(),
-                            [
-                                SymfonyResponseAlias::HTTP_UNAUTHORIZED,
-                                SymfonyResponseAlias::HTTP_FORBIDDEN,
-                                SymfonyResponseAlias::HTTP_NOT_FOUND,
-                                SymfonyResponseAlias::HTTP_METHOD_NOT_ALLOWED,
-                                SymfonyResponseAlias::HTTP_TOO_MANY_REQUESTS,
-                            ]
-                        );
-                    }
-                }
-
-                // Retry on 5xx errors and network issues
-                return true;
-            })
+            )
             ->acceptJson();
     }
 

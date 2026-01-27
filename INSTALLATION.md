@@ -29,9 +29,6 @@ Add the following environment variables to your `.env` file:
 ```env
 PROOFAGE_API_KEY=your-api-key-here
 PROOFAGE_SECRET_KEY=your-secret-key-here
-PROOFAGE_BASE_URL=https://api.proofage.xyz
-PROOFAGE_VERSION=v1
-PROOFAGE_TIMEOUT=30
 ```
 
 ### 4. Verify Installation

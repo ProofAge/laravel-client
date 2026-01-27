@@ -11,9 +11,9 @@ class ProofAgeWebhookController extends Controller
     /**
      * Handle incoming ProofAge webhook
      *
-     * This route should be protected with the 'proofage.verify' middleware:
+     * This route should be protected with the 'proofage.verify_webhook' middleware:
      * Route::post('/proofage/webhook', [ProofAgeWebhookController::class, 'handle'])
-     *     ->middleware('proofage.verify');
+     *     ->middleware('proofage.verify_webhook');
      */
     public function handle(Request $request): JsonResponse
     {
