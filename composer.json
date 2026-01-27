@@ -1,0 +1,46 @@
+{
+    "name": "proofage/laravel-client",
+    "description": "Laravel client package for ProofAge API with HMAC authentication",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "ProofAge Team",
+            "email": "support@proofage.xyz"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/config": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0",
+        "mockery/mockery": "^1.6",
+        "laravel/pint": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ProofAge\\Laravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ProofAge\\Laravel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ProofAge\\Laravel\\ProofAgeServiceProvider"
+            ],
+            "aliases": {
+                "ProofAge": "ProofAge\\Laravel\\Facades\\ProofAge"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
