@@ -52,17 +52,24 @@ class ProofAgeClient
             'X-API-Key' => $this->config['api_key'],
         ]);
 
-        // Add HMAC signature
-        $signature = $this->generateHmacSignature($method, $endpoint, $data, $files);
-        $request = $request->withHeaders([
-            'X-HMAC-Signature' => $signature,
-        ]);
-
-        // Handle file uploads
         if (! empty($files)) {
+            // Multipart: sign using field canonicalization + file hashes
+            $signature = $this->generateHmacSignatureForFiles($method, $endpoint, $data, $files);
+            $request = $request->withHeaders(['X-HMAC-Signature' => $signature]);
             $response = $request->attach($files)->send($method, $url, ['form_params' => $data]);
         } else {
-            $response = $request->send($method, $url, ['form_params' => $data]);
+            // JSON: serialize body once, sign raw bytes, send the same bytes
+            $rawBody = ! empty($data) ? json_encode($data) : '';
+            $signature = $this->generateHmacSignature($method, $endpoint, $rawBody);
+            $request = $request->withHeaders(['X-HMAC-Signature' => $signature]);
+
+            if ($rawBody !== '') {
+                $response = $request
+                    ->withHeader('Content-Type', 'application/json')
+                    ->send($method, $url, ['body' => $rawBody]);
+            } else {
+                $response = $request->send($method, $url);
+            }
         }
 
         return $this->handleResponse($response);
@@ -129,27 +136,34 @@ class ProofAgeClient
         return "{$baseUrl}/{$version}/{$endpoint}";
     }
 
-    protected function generateHmacSignature(string $method, string $endpoint, array $data = [], array $files = []): string
+    /**
+     * Generate HMAC signature for non-file requests using the raw body bytes.
+     */
+    protected function generateHmacSignature(string $method, string $endpoint, string $rawBody = ''): string
     {
         $method = strtoupper($method);
         $path = '/'.$this->config['version'].'/'.ltrim($endpoint, '/');
 
-        $canonicalRequest = $method.$path;
+        $canonicalRequest = $method.$path.$rawBody;
 
-        if (! empty($files)) {
-            // Handle multipart form data with files
-            $fields = $this->canonicalizeArrayForQuery($data);
-            $fieldsString = http_build_query($fields, '', '&', PHP_QUERY_RFC3986);
+        return hash_hmac('sha256', $canonicalRequest, $this->config['secret_key']);
+    }
 
-            $fileHashes = $this->collectFileHashes($files);
-            sort($fileHashes); // Stabilize order
+    /**
+     * Generate HMAC signature for multipart requests with files.
+     */
+    protected function generateHmacSignatureForFiles(string $method, string $endpoint, array $data, array $files): string
+    {
+        $method = strtoupper($method);
+        $path = '/'.$this->config['version'].'/'.ltrim($endpoint, '/');
 
-            $canonicalRequest .= "\n".$fieldsString."\n".implode(',', $fileHashes);
-        } else {
-            // Handle JSON data - append raw JSON content
-            $jsonContent = empty($data) ? '' : json_encode($data, JSON_UNESCAPED_SLASHES);
-            $canonicalRequest .= $jsonContent;
-        }
+        $fields = $this->canonicalizeArrayForQuery($data);
+        $fieldsString = http_build_query($fields, '', '&', PHP_QUERY_RFC3986);
+
+        $fileHashes = $this->collectFileHashes($files);
+        sort($fileHashes);
+
+        $canonicalRequest = $method.$path."\n".$fieldsString."\n".implode(',', $fileHashes);
 
         return hash_hmac('sha256', $canonicalRequest, $this->config['secret_key']);
     }

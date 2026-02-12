@@ -74,15 +74,21 @@ class ProofAgeClientTest extends TestCase
         $method = 'POST';
         $endpoint = 'verifications';
         $data = ['callback_url' => 'https://example.com/webhook'];
+        $rawBody = json_encode($data);
 
         $reflection = new \ReflectionClass($this->client);
         $methodReflection = $reflection->getMethod('generateHmacSignature');
         $methodReflection->setAccessible(true);
 
-        $signature = $methodReflection->invoke($this->client, $method, $endpoint, $data);
+        $signature = $methodReflection->invoke($this->client, $method, $endpoint, $rawBody);
+
+        // Verify signature matches expected HMAC
+        $expectedCanonical = 'POST/v1/verifications'.$rawBody;
+        $expectedSignature = hash_hmac('sha256', $expectedCanonical, 'test-secret-key');
 
         $this->assertIsString($signature);
-        $this->assertEquals(64, strlen($signature)); // SHA256 hash length
+        $this->assertEquals(64, strlen($signature));
+        $this->assertEquals($expectedSignature, $signature);
     }
 
     public function test_it_can_accept_consent_for_verification(): void
