@@ -19,11 +19,11 @@ return [
 
     'version' => env('PROOFAGE_VERSION', 'v1'),
 
-    'timeout' => env('PROOFAGE_TIMEOUT', 30),
+    'timeout' => (int) env('PROOFAGE_TIMEOUT', 30),
 
-    'retry_attempts' => env('PROOFAGE_RETRY_ATTEMPTS', 3),
+    'retry_attempts' => (int) env('PROOFAGE_RETRY_ATTEMPTS', 3),
 
-    'retry_delay' => env('PROOFAGE_RETRY_DELAY', 1000), // milliseconds
+    'retry_delay' => (int) env('PROOFAGE_RETRY_DELAY', 1000), // milliseconds
 
-    'webhook_tolerance' => env('PROOFAGE_WEBHOOK_TOLERANCE', 300), // seconds
+    'webhook_tolerance' => (int) env('PROOFAGE_WEBHOOK_TOLERANCE', 300), // seconds
 ];

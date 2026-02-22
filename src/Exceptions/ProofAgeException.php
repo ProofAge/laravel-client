@@ -26,8 +26,9 @@ class ProofAgeException extends Exception
     {
         $errorMessage = $message ?: 'ProofAge API request failed';
 
-        if ($response->json() && isset($response->json()['error']['message'])) {
-            $errorMessage = $response->json()['error']['message'];
+        $json = $response->json();
+        if ($json && isset($json['error']['message'])) {
+            $errorMessage = $json['error']['message'];
         }
 
         return new static($errorMessage, $response->status(), null, $response);
