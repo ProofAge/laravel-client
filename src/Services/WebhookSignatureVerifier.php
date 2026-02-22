@@ -18,7 +18,7 @@ class WebhookSignatureVerifier
 
     public function isTimestampValid(int $timestamp): bool
     {
-        return (time() - $timestamp) <= $this->tolerance;
+        return abs(time() - $timestamp) <= $this->tolerance;
     }
 
     public function generateSignature(string $payload, int $timestamp): string

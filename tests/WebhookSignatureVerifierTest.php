@@ -92,6 +92,14 @@ class WebhookSignatureVerifierTest extends PHPUnitTestCase
         $this->assertFalse($verifier->isTimestampValid(time() - 61));
     }
 
+    public function test_is_timestamp_valid_rejects_future_timestamps(): void
+    {
+        $verifier = new WebhookSignatureVerifier($this->secret, 300);
+        $timestamp = time() + 3600;
+
+        $this->assertFalse($verifier->isTimestampValid($timestamp));
+    }
+
     public function test_generate_signature_matches_verify(): void
     {
         $verifier = new WebhookSignatureVerifier($this->secret);
