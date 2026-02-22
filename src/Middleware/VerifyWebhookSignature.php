@@ -4,110 +4,53 @@ namespace ProofAge\Laravel\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use ProofAge\Laravel\Exceptions\WebhookVerificationException;
+use ProofAge\Laravel\Services\WebhookSignatureVerifier;
 use Symfony\Component\HttpFoundation\Response;
 
 class VerifyWebhookSignature
 {
-    /**
-     * Handle an incoming webhook request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $configPrefix = 'proofage'): Response
     {
-        $providedSignature = $request->header('X-HMAC-Signature');
+        $signature = $request->header('X-HMAC-Signature');
         $timestamp = $request->header('X-Timestamp');
         $authClient = $request->header('X-Auth-Client');
 
-        if (! $providedSignature) {
-            return response()->json([
-                'error' => [
-                    'code' => 'MISSING_SIGNATURE',
-                    'message' => 'X-HMAC-Signature header is required',
-                ],
-            ], Response::HTTP_UNAUTHORIZED);
+        if (! $signature) {
+            throw new WebhookVerificationException('MISSING_SIGNATURE', 'X-HMAC-Signature header is required');
         }
 
         if (! $timestamp) {
-            return response()->json([
-                'error' => [
-                    'code' => 'MISSING_TIMESTAMP',
-                    'message' => 'X-Timestamp header is required',
-                ],
-            ], Response::HTTP_UNAUTHORIZED);
+            throw new WebhookVerificationException('MISSING_TIMESTAMP', 'X-Timestamp header is required');
         }
 
         if (! $authClient) {
-            return response()->json([
-                'error' => [
-                    'code' => 'MISSING_AUTH_CLIENT',
-                    'message' => 'X-Auth-Client header is required',
-                ],
-            ], Response::HTTP_UNAUTHORIZED);
+            throw new WebhookVerificationException('MISSING_AUTH_CLIENT', 'X-Auth-Client header is required');
         }
 
-        // Verify timestamp is not too old (prevent replay attacks)
+        $secretKey = config("{$configPrefix}.secret_key");
+        $apiKey = config("{$configPrefix}.api_key");
+        $tolerance = (int) config("{$configPrefix}.webhook_tolerance", 300);
+
+        if (! $secretKey || ! $apiKey) {
+            throw new WebhookVerificationException('CONFIGURATION_ERROR', 'Middleware configuration is incomplete', 418);
+        }
+
+        if ($apiKey !== $authClient) {
+            throw new WebhookVerificationException('INVALID_AUTH_CLIENT', 'X-Auth-Client header is invalid');
+        }
+
+        $verifier = new WebhookSignatureVerifier($secretKey, $tolerance);
         $timestampInt = (int) $timestamp;
-        $timestampAge = now()->timestamp - $timestampInt;
-        if ($timestampAge > 300) { // 5 minutes tolerance
-            return response()->json([
-                'error' => [
-                    'code' => 'TIMESTAMP_TOO_OLD',
-                    'message' => 'Timestamp is too old',
-                ],
-            ], Response::HTTP_UNAUTHORIZED);
+
+        if (! $verifier->isTimestampValid($timestampInt)) {
+            throw new WebhookVerificationException('TIMESTAMP_TOO_OLD', 'Timestamp is too old');
         }
 
-        $secretKey = config('proofage.secret_key');
-        $expectedApiKey = config('proofage.api_key');
-
-        if (! $secretKey || ! $expectedApiKey) {
-            Log::error('ProofAge middleware: Secret key or API key is not configured');
-
-            return response()->json([
-                'error' => [
-                    'code' => 'CONFIGURATION_ERROR',
-                    'message' => 'Middleware configuration is incomplete',
-                ],
-            ], Response::HTTP_I_AM_A_TEAPOT);
-        }
-
-        if ($expectedApiKey !== $authClient) {
-            return response()->json([
-                'error' => [
-                    'code' => 'INVALID_AUTH_CLIENT',
-                    'message' => 'X-Auth-Client header is invalid',
-                ],
-            ], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $expectedSignature = $this->generateSignature($request, $timestampInt, $secretKey);
-
-        if (! hash_equals($expectedSignature, $providedSignature)) {
-            return response()->json([
-                'error' => [
-                    'code' => 'INVALID_SIGNATURE',
-                    'message' => 'HMAC signature is invalid',
-                ],
-            ], Response::HTTP_UNAUTHORIZED);
+        if (! $verifier->verify($request->getContent(), $timestampInt, $signature)) {
+            throw new WebhookVerificationException('INVALID_SIGNATURE', 'HMAC signature is invalid');
         }
 
         return $next($request);
-    }
-
-    /**
-     * Generate HMAC-SHA256 signature for webhook payload.
-     */
-    protected function generateSignature(Request $request, int $timestamp, string $secret): string
-    {
-        // Get the raw JSON body
-        $rawBody = $request->getContent();
-
-        // Create signature payload: "$timestamp.$rawBody"
-        $signaturePayload = $timestamp.'.'.$rawBody;
-
-        // Generate HMAC-SHA256 signature
-        return hash_hmac('sha256', $signaturePayload, $secret);
     }
 }
