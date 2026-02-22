@@ -2,7 +2,6 @@
 
 namespace ProofAge\Laravel\Tests;
 
-use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use ProofAge\Laravel\Exceptions\AuthenticationException;
@@ -19,6 +18,18 @@ class ProofAgeClientTest extends TestCase
         parent::setUp();
 
         $this->client = new ProofAgeClient([
+            'api_key' => 'test-api-key',
+            'secret_key' => 'test-secret-key',
+            'base_url' => 'https://api.test.com',
+            'version' => 'v1',
+        ]);
+    }
+
+    private function makeFakedClient(array $fakeResponses): ProofAgeClient
+    {
+        Http::fake($fakeResponses);
+
+        return new ProofAgeClient([
             'api_key' => 'test-api-key',
             'secret_key' => 'test-secret-key',
             'base_url' => 'https://api.test.com',
@@ -50,27 +61,55 @@ class ProofAgeClientTest extends TestCase
 
     public function test_it_can_get_workspace_information(): void
     {
-        // For now, let's focus on testing the signature generation
-        // and skip the HTTP-dependent tests until proper mocking is set up
-        $this->assertTrue(true);
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/workspace' => Http::response(['name' => 'Test Workspace', 'id' => 'ws_123']),
+        ]);
+
+        $result = $client->workspace()->get();
+
+        $this->assertEquals('Test Workspace', $result['name']);
+        $this->assertEquals('ws_123', $result['id']);
     }
 
     public function test_it_can_create_verification(): void
     {
-        // Temporarily skip HTTP-dependent tests
-        $this->assertTrue(true);
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications' => Http::response(['id' => 'ver_123', 'status' => 'pending']),
+        ]);
+
+        $result = $client->verifications()->create([
+            'callback_url' => 'https://example.com/webhook',
+        ]);
+
+        $this->assertEquals('ver_123', $result['id']);
+        $this->assertEquals('pending', $result['status']);
     }
 
     public function test_it_throws_authentication_exception_on_401(): void
     {
-        // Temporarily skip HTTP-dependent tests
-        $this->assertTrue(true);
+        $client = $this->makeFakedClient([
+            'api.test.com/*' => Http::response(['error' => ['message' => 'Invalid API key']], 401),
+        ]);
+
+        $this->expectException(AuthenticationException::class);
+        $this->expectExceptionMessage('Invalid API key');
+
+        $client->workspace()->get();
     }
 
     public function test_it_throws_validation_exception_on_422(): void
     {
-        // Temporarily skip HTTP-dependent tests
-        $this->assertTrue(true);
+        $client = $this->makeFakedClient([
+            'api.test.com/*' => Http::response([
+                'error' => ['message' => 'Validation failed'],
+                'errors' => ['callback_url' => ['The callback url field is required.']],
+            ], 422),
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Validation failed');
+
+        $client->verifications()->create([]);
     }
 
     public function test_it_generates_correct_hmac_signature_for_json_data(): void
@@ -86,7 +125,6 @@ class ProofAgeClientTest extends TestCase
 
         $signature = $methodReflection->invoke($this->client, $method, $endpoint, $rawBody);
 
-        // Verify signature matches expected HMAC
         $expectedCanonical = 'POST/v1/verifications'.$rawBody;
         $expectedSignature = hash_hmac('sha256', $expectedCanonical, 'test-secret-key');
 
@@ -97,14 +135,27 @@ class ProofAgeClientTest extends TestCase
 
     public function test_it_can_accept_consent_for_verification(): void
     {
-        // Temporarily skip HTTP-dependent tests
-        $this->assertTrue(true);
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_123/consent' => Http::response(['accepted' => true]),
+        ]);
+
+        $result = $client->verifications('ver_123')->acceptConsent([
+            'consent_version_id' => 1,
+            'text_sha256' => 'abc123',
+        ]);
+
+        $this->assertTrue($result['accepted']);
     }
 
     public function test_it_can_submit_verification(): void
     {
-        // Temporarily skip HTTP-dependent tests
-        $this->assertTrue(true);
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_123/submit' => Http::response(['id' => 'ver_123', 'status' => 'processing']),
+        ]);
+
+        $result = $client->verifications('ver_123')->submit();
+
+        $this->assertEquals('processing', $result['status']);
     }
 
     public function test_from_response_returns_correct_subclass_for_authentication(): void
@@ -131,15 +182,8 @@ class ProofAgeClientTest extends TestCase
 
     public function test_it_sends_file_upload_as_multipart(): void
     {
-        Http::fake([
+        $client = $this->makeFakedClient([
             'api.test.com/*' => Http::response(['id' => 'media_123'], 200),
-        ]);
-
-        $client = new ProofAgeClient([
-            'api_key' => 'test-api-key',
-            'secret_key' => 'test-secret-key',
-            'base_url' => 'https://api.test.com',
-            'version' => 'v1',
         ]);
 
         $file = UploadedFile::fake()->image('selfie.jpg', 640, 480);

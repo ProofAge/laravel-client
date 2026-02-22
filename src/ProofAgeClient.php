@@ -102,9 +102,9 @@ class ProofAgeClient
     {
         $this->http = Http::timeout($this->config['timeout'])
             ->retry(
-                $this->config['retry_attempts'],
-                $this->config['retry_delay'],
-                function (Exception $exception, $request) {
+                times: $this->config['retry_attempts'],
+                sleepMilliseconds: $this->config['retry_delay'],
+                when: function (Exception $exception, $request) {
                     if ($exception instanceof ConnectionException) {
                         return true;
                     }
@@ -117,9 +117,9 @@ class ProofAgeClient
                         }
                     }
 
-                    // Retry on 5xx errors and network issues
                     return true;
-                }
+                },
+                throw: false,
             )
             ->acceptJson();
     }
