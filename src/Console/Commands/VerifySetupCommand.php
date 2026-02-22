@@ -29,28 +29,26 @@ class VerifySetupCommand extends Command
      */
     public function handle(): int
     {
-        // Check configuration
-        $this->checkConfiguration();
+        if (! $this->checkConfiguration()) {
+            return self::FAILURE;
+        }
 
-        // Check workspace connection and webhook configuration
         $result = $this->checkWorkspaceAndWebhook();
 
-        // Final status
+        if ($result === null) {
+            return self::FAILURE;
+        }
+
         if ($result['webhook_configured']) {
             $this->info('✅ ProofAge setup verified successfully!');
-
-            return self::SUCCESS;
         } else {
             $this->warn('⚠️  ProofAge setup partially verified. Webhooks are not configured.');
-
-            return self::SUCCESS; // Still return SUCCESS as basic setup works
         }
+
+        return self::SUCCESS;
     }
 
-    /**
-     * Check configuration
-     */
-    private function checkConfiguration(): void
+    private function checkConfiguration(): bool
     {
         $requiredConfig = [
             'api_key' => config('proofage.api_key'),
@@ -68,16 +66,16 @@ class VerifySetupCommand extends Command
         if (! empty($missing)) {
             $this->error('Missing configuration settings: '.implode(', ', $missing));
             $this->error('Please publish and configure the config/proofage.php file');
-            exit(self::FAILURE);
+
+            return false;
         }
 
         $this->info('✅ Configuration is valid');
+
+        return true;
     }
 
-    /**
-     * Check workspace connection and webhook configuration
-     */
-    private function checkWorkspaceAndWebhook(): array
+    private function checkWorkspaceAndWebhook(): ?array
     {
         try {
             $client = app(ProofAgeClient::class);
@@ -87,25 +85,23 @@ class VerifySetupCommand extends Command
 
             if ($data === null) {
                 $this->error('Failed to retrieve workspace data');
-                exit(self::FAILURE);
+
+                return null;
             }
 
             $this->info('✅ Workspace connection successful');
 
-            // Check webhook configuration
             $webhookConfigured = false;
 
             if (isset($data['webhook_url']) && ! empty($data['webhook_url'])) {
                 $webhookUrl = $data['webhook_url'];
                 $this->info('✅ Webhook URL is configured '.$webhookUrl);
 
-                // Check if route exists in Laravel application
                 $routeCheck = $this->checkWebhookRouteExists($webhookUrl);
 
                 if ($routeCheck['route_found'] && $routeCheck['post_method_found']) {
                     $this->info('✅ Webhook route found: '.implode('|', $routeCheck['route_info']->methods()).' '.$routeCheck['route_info']->uri().' -> '.$routeCheck['route_info']->getActionName());
 
-                    // Check middleware separately
                     if ($routeCheck['middleware_found']) {
                         $this->info('✅ Webhook route is protected with VerifyWebhookSignature middleware');
                         $webhookConfigured = true;
@@ -113,7 +109,6 @@ class VerifySetupCommand extends Command
                         $this->error('❌ Webhook routes must be protected with the VerifyWebhookSignature middleware to prevent unauthorized access.');
                         $this->line('   Add the \'proofage.verify_webhook\' middleware to your route:');
 
-                        // Generate specific example based on found route
                         $routeUri = $routeCheck['route_info']->uri();
                         $actionName = $routeCheck['route_info']->getActionName();
 
@@ -123,26 +118,19 @@ class VerifySetupCommand extends Command
                         } else {
                             $this->line('   Route::post(\''.$routeUri.'\', \''.$actionName.'\')->middleware(\'proofage.verify_webhook\');');
                         }
-
-                        $webhookConfigured = false;
                     }
                 } elseif ($routeCheck['route_found'] && ! $routeCheck['post_method_found']) {
                     $this->error('❌ Webhook route found but does not accept the POST method. Current methods: '.implode('|', $routeCheck['route_info']->methods()));
-                    $webhookConfigured = false;
                 } else {
                     $this->error('❌ Webhook route not found in Laravel routes');
                     $this->line('   Make sure you have created a route and controller method to handle webhook requests.');
 
-                    // Generate specific example based on webhook URL
                     $webhookPath = $routeCheck['webhook_path'];
                     $this->line('   Example: Route::post(\'/'.$webhookPath.'\', [WebhookController::class, \'handle\'])->middleware(\'proofage.verify_webhook\');');
-
-                    $webhookConfigured = false;
                 }
             } else {
                 $this->warn('⚠️  Webhook URL is not configured. Webhook notifications will not be sent.');
                 $this->line('   You can configure webhook_url in your ProofAge workspace settings.');
-                $webhookConfigured = false;
             }
 
             return [
@@ -153,7 +141,8 @@ class VerifySetupCommand extends Command
         } catch (\Exception $e) {
             $this->error('Failed to retrieve workspace data. Please check your API key and secret key configuration.');
             $this->line('Error details: '.$e->getMessage());
-            exit(self::FAILURE);
+
+            return null;
         }
     }
 
