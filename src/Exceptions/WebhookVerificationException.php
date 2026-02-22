@@ -9,6 +9,6 @@ class WebhookVerificationException extends ProofAgeException
         string $message,
         public readonly int $statusCode = 401,
     ) {
-        parent::__construct($message);
+        parent::__construct($message, $statusCode);
     }
 }
