@@ -3,6 +3,7 @@
 namespace ProofAge\Laravel\Tests;
 
 use Illuminate\Http\Client\Response;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use ProofAge\Laravel\Exceptions\AuthenticationException;
 use ProofAge\Laravel\Exceptions\ProofAgeException;
@@ -126,5 +127,29 @@ class ProofAgeClientTest extends TestCase
         $exception = ValidationException::fromResponse($response);
 
         $this->assertInstanceOf(ValidationException::class, $exception);
+    }
+
+    public function test_it_sends_file_upload_as_multipart(): void
+    {
+        Http::fake([
+            'api.test.com/*' => Http::response(['id' => 'media_123'], 200),
+        ]);
+
+        $client = new ProofAgeClient([
+            'api_key' => 'test-api-key',
+            'secret_key' => 'test-secret-key',
+            'base_url' => 'https://api.test.com',
+            'version' => 'v1',
+        ]);
+
+        $file = UploadedFile::fake()->image('selfie.jpg', 640, 480);
+
+        $client->makeRequest('POST', 'verifications/ver_123/media', ['type' => 'selfie'], ['file' => $file]);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'verifications/ver_123/media')
+                && $request->hasHeader('X-HMAC-Signature')
+                && $request->hasHeader('X-API-Key');
+        });
     }
 }

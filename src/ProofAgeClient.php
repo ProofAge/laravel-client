@@ -53,10 +53,18 @@ class ProofAgeClient
         ]);
 
         if (! empty($files)) {
-            // Multipart: sign using field canonicalization + file hashes
             $signature = $this->generateHmacSignatureForFiles($method, $endpoint, $data, $files);
             $request = $request->withHeaders(['X-HMAC-Signature' => $signature]);
-            $response = $request->attach($files)->send($method, $url, ['form_params' => $data]);
+
+            foreach ($files as $name => $file) {
+                if ($file instanceof UploadedFile) {
+                    $request = $request->attach($name, file_get_contents($file->getRealPath()), $file->getClientOriginalName());
+                } elseif (is_string($file) && file_exists($file)) {
+                    $request = $request->attach($name, file_get_contents($file), basename($file));
+                }
+            }
+
+            $response = $request->post($url, $data);
         } else {
             // JSON: serialize body once, sign raw bytes, send the same bytes
             $rawBody = ! empty($data) ? json_encode($data) : '';
