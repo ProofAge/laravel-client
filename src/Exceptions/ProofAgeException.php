@@ -30,7 +30,7 @@ class ProofAgeException extends Exception
             $errorMessage = $response->json()['error']['message'];
         }
 
-        return new self($errorMessage, $response->status(), null, $response);
+        return new static($errorMessage, $response->status(), null, $response);
     }
 
     public function getResponse(): ?Response

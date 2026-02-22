@@ -2,8 +2,11 @@
 
 namespace ProofAge\Laravel\Tests;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use ProofAge\Laravel\Exceptions\AuthenticationException;
 use ProofAge\Laravel\Exceptions\ProofAgeException;
+use ProofAge\Laravel\Exceptions\ValidationException;
 use ProofAge\Laravel\ProofAgeClient;
 
 class ProofAgeClientTest extends TestCase
@@ -101,5 +104,27 @@ class ProofAgeClientTest extends TestCase
     {
         // Temporarily skip HTTP-dependent tests
         $this->assertTrue(true);
+    }
+
+    public function test_from_response_returns_correct_subclass_for_authentication(): void
+    {
+        $response = Http::fake([
+            '*' => Http::response(['error' => ['message' => 'Unauthorized']], 401),
+        ])->get('https://example.com');
+
+        $exception = AuthenticationException::fromResponse($response);
+
+        $this->assertInstanceOf(AuthenticationException::class, $exception);
+    }
+
+    public function test_from_response_returns_correct_subclass_for_validation(): void
+    {
+        $response = Http::fake([
+            '*' => Http::response(['error' => ['message' => 'Validation failed'], 'errors' => ['field' => ['required']]], 422),
+        ])->get('https://example.com');
+
+        $exception = ValidationException::fromResponse($response);
+
+        $this->assertInstanceOf(ValidationException::class, $exception);
     }
 }
