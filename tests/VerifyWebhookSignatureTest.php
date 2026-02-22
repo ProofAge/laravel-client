@@ -224,24 +224,21 @@ class VerifyWebhookSignatureTest extends TestCase
         $this->middleware->handle($request, $this->passthrough());
     }
 
-    public function test_exception_renderer_produces_correct_json(): void
+    public function test_middleware_throws_webhook_verification_exception(): void
     {
         $this->app['router']->post('/test-webhook', function () {
             return response()->json(['success' => true]);
         })->middleware('proofage.verify_webhook');
 
-        $response = $this->postJson('/test-webhook', ['test' => 'data'], [
+        $this->withoutExceptionHandling();
+
+        $this->expectException(WebhookVerificationException::class);
+        $this->expectExceptionMessage('HMAC signature is invalid');
+
+        $this->postJson('/test-webhook', ['test' => 'data'], [
             'X-HMAC-Signature' => 'bad',
             'X-Timestamp' => (string) now()->timestamp,
             'X-Auth-Client' => 'test-api-key',
-        ]);
-
-        $response->assertStatus(401);
-        $response->assertJson([
-            'error' => [
-                'code' => 'INVALID_SIGNATURE',
-                'message' => 'HMAC signature is invalid',
-            ],
         ]);
     }
 

@@ -2,11 +2,9 @@
 
 namespace ProofAge\Laravel;
 
-use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use ProofAge\Laravel\Console\Commands\VerifySetupCommand;
-use ProofAge\Laravel\Exceptions\WebhookVerificationException;
 use ProofAge\Laravel\Middleware\VerifyWebhookSignature;
 
 class ProofAgeServiceProvider extends ServiceProvider
@@ -47,23 +45,10 @@ class ProofAgeServiceProvider extends ServiceProvider
             ], 'config');
         }
 
-        // Register middleware
         $router = $this->app->make(Router::class);
         $router->aliasMiddleware('proofage.verify_webhook', VerifyWebhookSignature::class);
 
-        // Register default exception renderer for webhook verification errors
-        $this->app->make(ExceptionHandler::class)->renderable(
-            function (WebhookVerificationException $e) {
-                return response()->json([
-                    'error' => [
-                        'code' => $e->errorCode,
-                        'message' => $e->getMessage(),
-                    ],
-                ], $e->statusCode);
-            }
-        );
 
-        // Register commands
         if ($this->app->runningInConsole()) {
             $this->commands([
                 VerifySetupCommand::class,

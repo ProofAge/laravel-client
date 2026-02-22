@@ -186,6 +186,45 @@ try {
 }
 ```
 
+### Webhook Exception Handling
+
+The webhook middleware throws `WebhookVerificationException` on invalid requests. To return JSON error responses, register a renderable in your application's exception handler:
+
+**Laravel 11+ (`bootstrap/app.php`):**
+
+```php
+use ProofAge\Laravel\Exceptions\WebhookVerificationException;
+
+->withExceptions(function (Exceptions $exceptions) {
+    $exceptions->renderable(function (WebhookVerificationException $e) {
+        return response()->json([
+            'error' => [
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ],
+        ], $e->statusCode);
+    });
+})
+```
+
+**Laravel 10 (`app/Exceptions/Handler.php`):**
+
+```php
+use ProofAge\Laravel\Exceptions\WebhookVerificationException;
+
+public function register(): void
+{
+    $this->renderable(function (WebhookVerificationException $e) {
+        return response()->json([
+            'error' => [
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ],
+        ], $e->statusCode);
+    });
+}
+```
+
 ## Testing
 
 ```bash
