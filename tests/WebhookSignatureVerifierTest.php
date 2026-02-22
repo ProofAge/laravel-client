@@ -14,7 +14,7 @@ class WebhookSignatureVerifierTest extends PHPUnitTestCase
         $verifier = new WebhookSignatureVerifier($this->secret);
         $payload = '{"event": "verification.completed"}';
         $timestamp = time();
-        $signature = hash_hmac('sha256', $timestamp . '.' . $payload, $this->secret);
+        $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $this->secret);
 
         $this->assertTrue($verifier->verify($payload, $timestamp, $signature));
     }
@@ -33,7 +33,7 @@ class WebhookSignatureVerifierTest extends PHPUnitTestCase
         $verifier = new WebhookSignatureVerifier($this->secret);
         $payload = '{"event": "verification.completed"}';
         $timestamp = time();
-        $signature = hash_hmac('sha256', $timestamp . '.' . $payload, 'wrong-secret');
+        $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'wrong-secret');
 
         $this->assertFalse($verifier->verify($payload, $timestamp, $signature));
     }
@@ -43,7 +43,7 @@ class WebhookSignatureVerifierTest extends PHPUnitTestCase
         $verifier = new WebhookSignatureVerifier($this->secret);
         $originalPayload = '{"status": "approved"}';
         $timestamp = time();
-        $signature = hash_hmac('sha256', $timestamp . '.' . $originalPayload, $this->secret);
+        $signature = hash_hmac('sha256', $timestamp.'.'.$originalPayload, $this->secret);
 
         $tamperedPayload = '{"status": "declined"}';
         $this->assertFalse($verifier->verify($tamperedPayload, $timestamp, $signature));
@@ -54,7 +54,7 @@ class WebhookSignatureVerifierTest extends PHPUnitTestCase
         $verifier = new WebhookSignatureVerifier($this->secret);
         $payload = '';
         $timestamp = time();
-        $signature = hash_hmac('sha256', $timestamp . '.' . $payload, $this->secret);
+        $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $this->secret);
 
         $this->assertTrue($verifier->verify($payload, $timestamp, $signature));
     }

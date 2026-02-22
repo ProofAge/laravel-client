@@ -121,7 +121,7 @@ class VerifyWebhookSignatureTest extends TestCase
         $secret = 'test-secret-key';
         $timestamp = now()->timestamp;
         $body = '{"test": "data"}';
-        $signature = hash_hmac('sha256', $timestamp . '.' . $body, $secret);
+        $signature = hash_hmac('sha256', $timestamp.'.'.$body, $secret);
 
         $request = $this->makeRequest(body: $body);
         $request->headers->set('X-HMAC-Signature', $signature);
@@ -138,7 +138,7 @@ class VerifyWebhookSignatureTest extends TestCase
         $secret = 'test-secret-key';
         $timestamp = now()->timestamp;
         $body = '';
-        $signature = hash_hmac('sha256', $timestamp . '.' . $body, $secret);
+        $signature = hash_hmac('sha256', $timestamp.'.'.$body, $secret);
 
         $request = $this->makeRequest(body: $body);
         $request->headers->set('X-HMAC-Signature', $signature);
@@ -162,7 +162,7 @@ class VerifyWebhookSignatureTest extends TestCase
 
         $timestamp = now()->timestamp;
         $body = '{"verification_id": "ver_123"}';
-        $signature = hash_hmac('sha256', $timestamp . '.' . $body, $sellerSecret);
+        $signature = hash_hmac('sha256', $timestamp.'.'.$body, $sellerSecret);
 
         $request = $this->makeRequest(body: $body);
         $request->headers->set('X-HMAC-Signature', $signature);
@@ -190,7 +190,7 @@ class VerifyWebhookSignatureTest extends TestCase
 
         $timestamp = now()->timestamp;
         $body = '{"test": true}';
-        $signature = hash_hmac('sha256', $timestamp . '.' . $body, 'test-secret-key');
+        $signature = hash_hmac('sha256', $timestamp.'.'.$body, 'test-secret-key');
 
         $request = $this->makeRequest(body: $body);
         $request->headers->set('X-HMAC-Signature', $signature);
@@ -210,7 +210,7 @@ class VerifyWebhookSignatureTest extends TestCase
 
         $timestamp = now()->timestamp - 90;
         $body = '{"test": true}';
-        $signature = hash_hmac('sha256', $timestamp . '.' . $body, 'test-secret-key');
+        $signature = hash_hmac('sha256', $timestamp.'.'.$body, 'test-secret-key');
 
         $request = $this->makeRequest(body: $body);
         $request->headers->set('X-HMAC-Signature', $signature);

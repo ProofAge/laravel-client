@@ -42,7 +42,6 @@ class ProofAgeServiceProvider extends ServiceProvider
         $router = $this->app->make(Router::class);
         $router->aliasMiddleware('proofage.verify_webhook', VerifyWebhookSignature::class);
 
-
         if ($this->app->runningInConsole()) {
             $this->commands([
                 VerifySetupCommand::class,

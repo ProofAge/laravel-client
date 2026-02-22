@@ -23,6 +23,6 @@ class WebhookSignatureVerifier
 
     public function generateSignature(string $payload, int $timestamp): string
     {
-        return hash_hmac('sha256', $timestamp . '.' . $payload, $this->secretKey);
+        return hash_hmac('sha256', $timestamp.'.'.$payload, $this->secretKey);
     }
 }
