@@ -224,6 +224,30 @@ class VerifyWebhookSignatureTest extends TestCase
         $this->middleware->handle($request, $this->passthrough());
     }
 
+    public function test_custom_prefix_inherits_webhook_tolerance_from_default(): void
+    {
+        config(['proofage.webhook_tolerance' => 60]);
+        config([
+            'services.proofage_seller.api_key' => 'seller-api-key',
+            'services.proofage_seller.secret_key' => 'seller-secret-key',
+        ]);
+
+        $timestamp = now()->timestamp - 90;
+        $body = '{"test": true}';
+        $signature = hash_hmac('sha256', $timestamp.'.'.$body, 'seller-secret-key');
+
+        $request = $this->makeRequest(body: $body);
+        $request->headers->set('X-HMAC-Signature', $signature);
+        $request->headers->set('X-Timestamp', (string) $timestamp);
+        $request->headers->set('X-Auth-Client', 'seller-api-key');
+
+        $this->expectExceptionObject(
+            new WebhookVerificationException('TIMESTAMP_TOO_OLD', 'Timestamp is too old')
+        );
+
+        $this->middleware->handle($request, $this->passthrough(), 'services.proofage_seller');
+    }
+
     public function test_middleware_throws_webhook_verification_exception(): void
     {
         $this->app['router']->post('/test-webhook', function () {

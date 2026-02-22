@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use ProofAge\Laravel\Exceptions\WebhookVerificationException;
 use ProofAge\Laravel\Services\WebhookSignatureVerifier;
+use ProofAge\Laravel\Support\ConfigResolver;
 use Symfony\Component\HttpFoundation\Response;
 
 class VerifyWebhookSignature
@@ -28,9 +29,10 @@ class VerifyWebhookSignature
             throw new WebhookVerificationException('MISSING_AUTH_CLIENT', 'X-Auth-Client header is required');
         }
 
-        $secretKey = config("{$configPrefix}.secret_key");
-        $apiKey = config("{$configPrefix}.api_key");
-        $tolerance = (int) config("{$configPrefix}.webhook_tolerance", 300);
+        $config = ConfigResolver::resolve($configPrefix);
+        $secretKey = $config['secret_key'];
+        $apiKey = $config['api_key'];
+        $tolerance = (int) ($config['webhook_tolerance'] ?? 300);
 
         if (! $secretKey || ! $apiKey) {
             throw new WebhookVerificationException('CONFIGURATION_ERROR', 'Middleware configuration is incomplete', 418);

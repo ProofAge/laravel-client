@@ -108,13 +108,7 @@ ProofAge::verifications('verification-id')->submit();
 ```php
 use ProofAge\Laravel\ProofAgeClient;
 
-$client = new ProofAgeClient([
-    'api_key' => 'your-api-key',
-    'secret_key' => 'your-secret-key',
-    'base_url' => 'https://api.proofage.xyz',
-    'version' => 'v1'
-]);
-
+$client = app(ProofAgeClient::class);
 $workspace = $client->workspace()->get();
 ```
 
@@ -150,6 +144,102 @@ The middleware:
 3. Generates the expected signature using the same algorithm as ProofAge
 4. Compares signatures using `hash_equals()` for timing-safe comparison
 5. Returns appropriate error responses for invalid requests
+
+## Multiple Workspaces
+
+Some applications need separate verification flows for different user roles. For example, a marketplace where buyers go through a basic age check while sellers require full identity verification -- each with its own ProofAge workspace, credentials, and webhook endpoint.
+
+The package supports this out of the box. All shared settings (`base_url`, `version`, `timeout`, etc.) are inherited from the default `proofage` config, so additional workspaces only need their own `api_key` and `secret_key`.
+
+### Example: marketplace with buyer and seller verification
+
+#### 1. Configure credentials for each workspace
+
+The default workspace (buyers) is configured via `config/proofage.php` as usual. For sellers, add a second set of credentials anywhere in your application config -- `config/services.php` is a common choice:
+
+```php
+// config/services.php
+'proofage_seller' => [
+    'api_key' => env('PROOFAGE_SELLER_API_KEY'),
+    'secret_key' => env('PROOFAGE_SELLER_SECRET_KEY'),
+],
+```
+
+```env
+# .env
+# Buyer workspace (default)
+PROOFAGE_API_KEY=pk_live_...
+PROOFAGE_SECRET_KEY=sk_live_...
+
+# Seller workspace
+PROOFAGE_SELLER_API_KEY=pk_live_...
+PROOFAGE_SELLER_SECRET_KEY=sk_live_...
+```
+
+#### 2. Create verifications with the correct client
+
+The `ProofAge` facade and `app(ProofAgeClient::class)` singleton always use the default (buyer) workspace. For the seller workspace, use `ProofAgeClientFactory`:
+
+```php
+use ProofAge\Laravel\Facades\ProofAge;
+use ProofAge\Laravel\ProofAgeClientFactory;
+
+// Buyer verification -- uses default proofage.* config
+$buyerVerification = ProofAge::verifications()->create([
+    'callback_url' => 'https://marketplace.com/webhooks/proofage',
+]);
+
+// Seller verification -- uses services.proofage_seller config
+$sellerClient = app(ProofAgeClientFactory::class)->make('services.proofage_seller');
+$sellerVerification = $sellerClient->verifications()->create([
+    'callback_url' => 'https://marketplace.com/webhooks/proofage-seller',
+]);
+```
+
+#### 3. Set up separate webhook routes
+
+Each workspace sends webhooks signed with its own secret key. Use the middleware's config prefix parameter to verify signatures with the correct credentials:
+
+```php
+// routes/api.php
+
+// Buyer webhooks -- verified with default proofage.* keys
+Route::post('/webhooks/proofage', [BuyerWebhookController::class, 'handle'])
+    ->middleware('proofage.verify_webhook');
+
+// Seller webhooks -- verified with services.proofage_seller keys
+Route::post('/webhooks/proofage-seller', [SellerWebhookController::class, 'handle'])
+    ->middleware('proofage.verify_webhook:services.proofage_seller');
+```
+
+#### 4. Verify setup for each workspace
+
+```bash
+# Check the buyer (default) workspace
+php artisan proofage:verify-setup
+
+# Check the seller workspace
+php artisan proofage:verify-setup --config=services.proofage_seller
+```
+
+The command checks configuration, API connectivity, webhook route existence, and that the middleware uses the matching config prefix -- so you'll be warned if the keys would mismatch.
+
+### Config resolution
+
+When a custom config prefix is used, the following resolution rules apply:
+
+| Key | Resolution |
+|-----|-----------|
+| `api_key` | Read from the specified prefix (required) |
+| `secret_key` | Read from the specified prefix (required) |
+| `base_url` | Specified prefix, falls back to `proofage.base_url` |
+| `version` | Specified prefix, falls back to `proofage.version` |
+| `timeout` | Specified prefix, falls back to `proofage.timeout` |
+| `retry_attempts` | Specified prefix, falls back to `proofage.retry_attempts` |
+| `retry_delay` | Specified prefix, falls back to `proofage.retry_delay` |
+| `webhook_tolerance` | Specified prefix, falls back to `proofage.webhook_tolerance` (default: 300s) |
+
+Additional workspaces only need `api_key` and `secret_key`. If a workspace connects to a different ProofAge environment (e.g. staging), add `base_url` under the same prefix and it will take priority over the default.
 
 ## API Methods
 

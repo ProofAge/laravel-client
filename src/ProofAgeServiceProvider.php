@@ -19,16 +19,10 @@ class ProofAgeServiceProvider extends ServiceProvider
             'proofage'
         );
 
+        $this->app->singleton(ProofAgeClientFactory::class);
+
         $this->app->singleton(ProofAgeClient::class, function ($app) {
-            return new ProofAgeClient([
-                'api_key' => config('proofage.api_key'),
-                'secret_key' => config('proofage.secret_key'),
-                'base_url' => config('proofage.base_url'),
-                'version' => config('proofage.version'),
-                'timeout' => config('proofage.timeout'),
-                'retry_attempts' => config('proofage.retry_attempts'),
-                'retry_delay' => config('proofage.retry_delay'),
-            ]);
+            return $app->make(ProofAgeClientFactory::class)->make();
         });
 
         $this->app->alias(ProofAgeClient::class, 'proofage');

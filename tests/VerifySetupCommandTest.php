@@ -96,4 +96,79 @@ class VerifySetupCommandTest extends TestCase
             ->expectsOutputToContain('Webhooks are not configured')
             ->assertExitCode(0);
     }
+
+    public function test_custom_config_prefix_succeeds(): void
+    {
+        config([
+            'services.proofage_seller.api_key' => 'seller-api-key',
+            'services.proofage_seller.secret_key' => 'seller-secret-key',
+        ]);
+
+        Http::fake([
+            'api.test.com/v1/workspace' => Http::response([
+                'name' => 'Seller Workspace',
+            ]),
+        ]);
+
+        $this->artisan('proofage:verify-setup', ['--config' => 'services.proofage_seller'])
+            ->expectsOutputToContain('Configuration is valid')
+            ->expectsOutputToContain('Workspace connection successful')
+            ->assertExitCode(0);
+    }
+
+    public function test_custom_config_prefix_fails_when_keys_missing(): void
+    {
+        $this->artisan('proofage:verify-setup', ['--config' => 'services.proofage_seller'])
+            ->expectsOutputToContain('Missing configuration settings')
+            ->expectsOutputToContain('services.proofage_seller')
+            ->assertExitCode(1);
+    }
+
+    public function test_custom_config_prefix_with_matching_middleware(): void
+    {
+        config([
+            'services.proofage_seller.api_key' => 'seller-api-key',
+            'services.proofage_seller.secret_key' => 'seller-secret-key',
+        ]);
+
+        Http::fake([
+            'api.test.com/v1/workspace' => Http::response([
+                'name' => 'Seller Workspace',
+                'webhook_url' => 'https://myapp.com/webhooks/seller',
+            ]),
+        ]);
+
+        $this->app['router']->post('webhooks/seller', function () {
+            return 'ok';
+        })->middleware('proofage.verify_webhook:services.proofage_seller');
+
+        $this->artisan('proofage:verify-setup', ['--config' => 'services.proofage_seller'])
+            ->expectsOutputToContain('Webhook route is protected')
+            ->expectsOutputToContain('ProofAge setup verified successfully')
+            ->assertExitCode(0);
+    }
+
+    public function test_custom_config_prefix_warns_on_middleware_prefix_mismatch(): void
+    {
+        config([
+            'services.proofage_seller.api_key' => 'seller-api-key',
+            'services.proofage_seller.secret_key' => 'seller-secret-key',
+        ]);
+
+        Http::fake([
+            'api.test.com/v1/workspace' => Http::response([
+                'name' => 'Seller Workspace',
+                'webhook_url' => 'https://myapp.com/webhooks/seller',
+            ]),
+        ]);
+
+        $this->app['router']->post('webhooks/seller', function () {
+            return 'ok';
+        })->middleware('proofage.verify_webhook');
+
+        $this->artisan('proofage:verify-setup', ['--config' => 'services.proofage_seller'])
+            ->expectsOutputToContain('different config prefix')
+            ->expectsOutputToContain('Webhooks are not configured')
+            ->assertExitCode(0);
+    }
 }

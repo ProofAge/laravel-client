@@ -3,37 +3,29 @@
 namespace ProofAge\Laravel\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Route;
 use ProofAge\Laravel\Middleware\VerifyWebhookSignature;
-use ProofAge\Laravel\ProofAgeClient;
+use ProofAge\Laravel\ProofAgeClientFactory;
 use ProofAge\Laravel\Resources\WorkspaceResource;
+use ProofAge\Laravel\Support\ConfigResolver;
 
 class VerifySetupCommand extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'proofage:verify-setup';
+    protected $signature = 'proofage:verify-setup
+        {--config=proofage : Config prefix to read api_key/secret_key from}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Verify that ProofAge configuration is set and test workspace connection';
 
-    /**
-     * Execute the console command.
-     */
     public function handle(): int
     {
-        if (! $this->checkConfiguration()) {
+        $configPrefix = $this->option('config');
+
+        if (! $this->checkConfiguration($configPrefix)) {
             return self::FAILURE;
         }
 
-        $result = $this->checkWorkspaceAndWebhook();
+        $result = $this->checkWorkspaceAndWebhook($configPrefix);
 
         if ($result === null) {
             return self::FAILURE;
@@ -48,24 +40,27 @@ class VerifySetupCommand extends Command
         return self::SUCCESS;
     }
 
-    private function checkConfiguration(): bool
+    private function checkConfiguration(string $configPrefix): bool
     {
-        $requiredConfig = [
-            'api_key' => config('proofage.api_key'),
-            'secret_key' => config('proofage.secret_key'),
-            'base_url' => config('proofage.base_url'),
-        ];
+        $config = ConfigResolver::resolve($configPrefix);
 
+        $required = ['api_key', 'secret_key', 'base_url'];
         $missing = [];
-        foreach ($requiredConfig as $key => $value) {
-            if (empty($value)) {
+
+        foreach ($required as $key) {
+            if (empty($config[$key])) {
                 $missing[] = $key;
             }
         }
 
         if (! empty($missing)) {
             $this->error('Missing configuration settings: '.implode(', ', $missing));
-            $this->error('Please publish and configure the config/proofage.php file');
+
+            if ($configPrefix === 'proofage') {
+                $this->error('Please publish and configure the config/proofage.php file');
+            } else {
+                $this->error("Please ensure '{$configPrefix}.api_key' and '{$configPrefix}.secret_key' are configured");
+            }
 
             return false;
         }
@@ -75,10 +70,10 @@ class VerifySetupCommand extends Command
         return true;
     }
 
-    private function checkWorkspaceAndWebhook(): ?array
+    private function checkWorkspaceAndWebhook(string $configPrefix): ?array
     {
         try {
-            $client = app(ProofAgeClient::class);
+            $client = app(ProofAgeClientFactory::class)->make($configPrefix);
             $workspace = new WorkspaceResource($client);
 
             $data = $workspace->get();
@@ -97,26 +92,34 @@ class VerifySetupCommand extends Command
                 $webhookUrl = $data['webhook_url'];
                 $this->info('✅ Webhook URL is configured '.$webhookUrl);
 
-                $routeCheck = $this->checkWebhookRouteExists($webhookUrl);
+                $routeCheck = $this->checkWebhookRouteExists($webhookUrl, $configPrefix);
 
                 if ($routeCheck['route_found'] && $routeCheck['post_method_found']) {
                     $this->info('✅ Webhook route found: '.implode('|', $routeCheck['route_info']->methods()).' '.$routeCheck['route_info']->uri().' -> '.$routeCheck['route_info']->getActionName());
 
                     if ($routeCheck['middleware_found']) {
-                        $this->info('✅ Webhook route is protected with VerifyWebhookSignature middleware');
-                        $webhookConfigured = true;
+                        if ($routeCheck['config_prefix_match']) {
+                            $this->info('✅ Webhook route is protected with VerifyWebhookSignature middleware');
+                            $webhookConfigured = true;
+                        } else {
+                            $this->warn('⚠️  Webhook route has VerifyWebhookSignature middleware but with a different config prefix.');
+                            $this->warn("   Expected: '{$configPrefix}', found: '{$routeCheck['middleware_config_prefix']}'");
+                            $this->warn('   The webhook will verify signatures with wrong keys.');
+                        }
                     } else {
                         $this->error('❌ Webhook routes must be protected with the VerifyWebhookSignature middleware to prevent unauthorized access.');
-                        $this->line('   Add the \'proofage.verify_webhook\' middleware to your route:');
 
                         $routeUri = $routeCheck['route_info']->uri();
                         $actionName = $routeCheck['route_info']->getActionName();
+                        $middlewareHint = $configPrefix === 'proofage'
+                            ? "'proofage.verify_webhook'"
+                            : "'proofage.verify_webhook:{$configPrefix}'";
 
                         if (str_contains($actionName, '@')) {
                             [$controller, $method] = explode('@', $actionName);
-                            $this->line('   Route::post(\''.$routeUri.'\', ['.$controller.'::class, \''.$method.'\'])->middleware(\'proofage.verify_webhook\');');
+                            $this->line("   Route::post('{$routeUri}', [{$controller}::class, '{$method}'])->middleware({$middlewareHint});");
                         } else {
-                            $this->line('   Route::post(\''.$routeUri.'\', \''.$actionName.'\')->middleware(\'proofage.verify_webhook\');');
+                            $this->line("   Route::post('{$routeUri}', '{$actionName}')->middleware({$middlewareHint});");
                         }
                     }
                 } elseif ($routeCheck['route_found'] && ! $routeCheck['post_method_found']) {
@@ -126,7 +129,10 @@ class VerifySetupCommand extends Command
                     $this->line('   Make sure you have created a route and controller method to handle webhook requests.');
 
                     $webhookPath = $routeCheck['webhook_path'];
-                    $this->line('   Example: Route::post(\'/'.$webhookPath.'\', [WebhookController::class, \'handle\'])->middleware(\'proofage.verify_webhook\');');
+                    $middlewareHint = $configPrefix === 'proofage'
+                        ? "'proofage.verify_webhook'"
+                        : "'proofage.verify_webhook:{$configPrefix}'";
+                    $this->line("   Example: Route::post('/{$webhookPath}', [WebhookController::class, 'handle'])->middleware({$middlewareHint});");
                 }
             } else {
                 $this->warn('⚠️  Webhook URL is not configured. Webhook notifications will not be sent.');
@@ -146,47 +152,43 @@ class VerifySetupCommand extends Command
         }
     }
 
-    /**
-     * Check if webhook route exists in Laravel application
-     */
-    private function checkWebhookRouteExists(string $webhookUrl): array
+    private function checkWebhookRouteExists(string $webhookUrl, string $configPrefix): array
     {
         try {
-            // Parse the path from webhook URL
             $parsedUrl = parse_url($webhookUrl);
-            $webhookPath = $parsedUrl['path'] ?? '';
+            $webhookPath = ltrim($parsedUrl['path'] ?? '', '/');
 
-            // Remove leading slash if present
-            $webhookPath = ltrim($webhookPath, '/');
-
-            // Get all registered routes
             $routes = Route::getRoutes();
+            $router = app(Router::class);
+            $aliasMap = $router->getMiddleware();
+
             $routeFound = false;
             $postMethodFound = false;
             $middlewareFound = false;
+            $configPrefixMatch = false;
+            $middlewareConfigPrefix = null;
             $routeInfo = null;
 
             foreach ($routes as $route) {
                 $routeUri = $route->uri();
 
-                // Check if route URI matches webhook path
                 if ($routeUri === $webhookPath || $routeUri === '/'.$webhookPath) {
                     $routeFound = true;
                     $routeInfo = $route;
 
-                    // Check if route accepts POST method
                     $methods = $route->methods();
                     if (in_array('POST', $methods) || in_array('ANY', $methods)) {
                         $postMethodFound = true;
                     }
 
-                    // Check if route has VerifyWebhookSignature middleware
-                    $middleware = $route->middleware();
-                    foreach ($middleware as $middlewareItem) {
-                        // Check for both the alias and the full class name
-                        if ($middlewareItem === 'proofage.verify_webhook' ||
-                            $middlewareItem === VerifyWebhookSignature::class) {
+                    foreach ($route->middleware() as $middlewareItem) {
+                        $parts = explode(':', $middlewareItem, 2);
+                        $resolved = $aliasMap[$parts[0]] ?? $parts[0];
+
+                        if ($resolved === VerifyWebhookSignature::class) {
                             $middlewareFound = true;
+                            $middlewareConfigPrefix = $parts[1] ?? 'proofage';
+                            $configPrefixMatch = ($middlewareConfigPrefix === $configPrefix);
                             break;
                         }
                     }
@@ -199,6 +201,8 @@ class VerifySetupCommand extends Command
                 'route_found' => $routeFound,
                 'post_method_found' => $postMethodFound,
                 'middleware_found' => $middlewareFound,
+                'config_prefix_match' => $configPrefixMatch,
+                'middleware_config_prefix' => $middlewareConfigPrefix,
                 'route_info' => $routeInfo,
                 'webhook_path' => $webhookPath,
             ];
@@ -208,6 +212,8 @@ class VerifySetupCommand extends Command
                 'route_found' => false,
                 'post_method_found' => false,
                 'middleware_found' => false,
+                'config_prefix_match' => false,
+                'middleware_config_prefix' => null,
                 'route_info' => null,
                 'webhook_path' => '',
                 'error' => $e->getMessage(),
