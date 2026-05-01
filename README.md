@@ -286,7 +286,18 @@ try {
 
 ### Webhook Exception Handling
 
-The webhook middleware throws `WebhookVerificationException` on invalid requests. To return JSON error responses, register a renderable in your application's exception handler:
+The webhook middleware throws `WebhookVerificationException` on invalid requests. By default, the exception renders a JSON error response:
+
+```json
+{
+    "error": {
+        "code": "INVALID_SIGNATURE",
+        "message": "HMAC signature is invalid"
+    }
+}
+```
+
+To customize this response, register a renderable in your application's exception handler:
 
 **Laravel 11+ (`bootstrap/app.php`):**
 

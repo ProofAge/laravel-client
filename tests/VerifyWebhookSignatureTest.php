@@ -133,6 +133,25 @@ class VerifyWebhookSignatureTest extends TestCase
         $this->assertEquals(200, $response->getStatusCode());
     }
 
+    public function test_valid_signature_allows_equivalent_json_with_unicode_escaping(): void
+    {
+        $secret = 'test-secret-key';
+        $timestamp = now()->timestamp;
+        $payload = $this->proofAgeWebhookPayload();
+        $signedBody = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $receivedBody = json_encode($payload);
+        $signature = hash_hmac('sha256', $timestamp.'.'.$signedBody, $secret);
+
+        $request = $this->makeRequest(body: $receivedBody);
+        $request->headers->set('X-HMAC-Signature', $signature);
+        $request->headers->set('X-Timestamp', (string) $timestamp);
+        $request->headers->set('X-Auth-Client', 'test-api-key');
+
+        $response = $this->middleware->handle($request, $this->passthrough());
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
     public function test_valid_signature_with_empty_body(): void
     {
         $secret = 'test-secret-key';
@@ -266,6 +285,28 @@ class VerifyWebhookSignatureTest extends TestCase
         ]);
     }
 
+    public function test_invalid_signature_returns_json_error_response(): void
+    {
+        $this->app['router']->post('/test-webhook-json-error', function () {
+            return response()->json(['success' => true]);
+        })->middleware('proofage.verify_webhook');
+
+        $response = $this->postJson('/test-webhook-json-error', ['test' => 'data'], [
+            'X-HMAC-Signature' => 'bad',
+            'X-Timestamp' => (string) now()->timestamp,
+            'X-Auth-Client' => 'test-api-key',
+        ]);
+
+        $response
+            ->assertStatus(401)
+            ->assertJson([
+                'error' => [
+                    'code' => 'INVALID_SIGNATURE',
+                    'message' => 'HMAC signature is invalid',
+                ],
+            ]);
+    }
+
     protected function makeRequest(string $body = ''): Request
     {
         return Request::create('/webhook', 'POST', [], [], [], [], $body);
@@ -274,5 +315,21 @@ class VerifyWebhookSignatureTest extends TestCase
     protected function passthrough(): \Closure
     {
         return fn () => response()->json(['success' => true]);
+    }
+
+    protected function proofAgeWebhookPayload(): array
+    {
+        return [
+            'verification_id' => '019de271-84a8-72e4-8225-f1db29a36058',
+            'status' => 'approved',
+            'external_id' => '1354976',
+            'external_metadata' => [
+                'name' => 'Sample profile 👸 with curly apostrophe I’d like to keep intact',
+                'email' => 'webhook-sample@example.test',
+                'country_code' => 'NL',
+            ],
+            'reason' => null,
+            'timestamp' => '2026-05-01T07:32:27+00:00',
+        ];
     }
 }

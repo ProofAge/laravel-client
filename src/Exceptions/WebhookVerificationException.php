@@ -11,4 +11,14 @@ class WebhookVerificationException extends ProofAgeException
     ) {
         parent::__construct($message, $statusCode);
     }
+
+    public function render($request)
+    {
+        return response()->json([
+            'error' => [
+                'code' => $this->errorCode,
+                'message' => $this->getMessage(),
+            ],
+        ], $this->statusCode);
+    }
 }
