@@ -3,12 +3,15 @@
 namespace ProofAge\Laravel\Facades;
 
 use Illuminate\Support\Facades\Facade;
+use ProofAge\Laravel\ProofAgeClient;
+use ProofAge\Laravel\Resources\VerificationResource;
+use ProofAge\Laravel\Resources\WorkspaceResource;
 
 /**
- * @method static \ProofAge\Laravel\Resources\WorkspaceResource workspace()
- * @method static \ProofAge\Laravel\Resources\VerificationResource verifications(string $id = null)
+ * @method static WorkspaceResource workspace()
+ * @method static VerificationResource verifications(string $id = null)
  *
- * @see \ProofAge\Laravel\ProofAgeClient
+ * @see ProofAgeClient
  */
 class ProofAge extends Facade
 {
