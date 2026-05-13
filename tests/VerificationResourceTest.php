@@ -181,4 +181,33 @@ class VerificationResourceTest extends TestCase
 
         $client->verifications()->submit();
     }
+
+    public function test_block_face_sends_post(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_123/blocked-face' => Http::response('', 204),
+        ]);
+
+        $result = $client->verifications('ver_123')->blockFace();
+
+        $this->assertNull($result);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/v1/verifications/ver_123/blocked-face')
+                && $request->hasHeader('X-HMAC-Signature');
+        });
+    }
+
+    public function test_block_face_throws_when_no_id(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/*' => Http::response([], 200),
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Verification ID is required');
+
+        $client->verifications()->blockFace();
+    }
 }
