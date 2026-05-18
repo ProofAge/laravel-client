@@ -182,6 +182,59 @@ class VerificationResourceTest extends TestCase
         $client->verifications()->submit();
     }
 
+    public function test_document_sends_get_to_document_endpoint(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_123/document' => Http::response([
+                'document' => [
+                    'fields' => [
+                        'first_name' => 'John',
+                        'last_name' => 'Doe',
+                        'date_of_birth' => '1990-01-15',
+                        'document_number' => 'AB123456',
+                    ],
+                ],
+                'media' => [
+                    [
+                        'id' => 'media_selfie',
+                        'type' => 'selfie',
+                        'signed_url' => 'https://storage.test/selfie.jpg',
+                        'expires_at' => '2026-05-18T13:00:00+00:00',
+                    ],
+                ],
+                'meta' => [
+                    'attempt_id' => 'attempt_123',
+                    'signed_url_ttl_seconds' => 3600,
+                    'signed_url_expires_at' => '2026-05-18T13:00:00+00:00',
+                ],
+            ]),
+        ]);
+
+        $result = $client->verifications('ver_123')->document();
+
+        $this->assertSame('John', $result['document']['fields']['first_name']);
+        $this->assertSame('AB123456', $result['document']['fields']['document_number']);
+        $this->assertSame(3600, $result['meta']['signed_url_ttl_seconds']);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'GET'
+                && str_contains($request->url(), '/v1/verifications/ver_123/document')
+                && $request->hasHeader('X-HMAC-Signature');
+        });
+    }
+
+    public function test_document_throws_when_no_id(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/*' => Http::response([], 200),
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Verification ID is required');
+
+        $client->verifications()->document();
+    }
+
     public function test_block_face_sends_post(): void
     {
         $client = $this->makeFakedClient([

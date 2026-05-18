@@ -112,6 +112,23 @@ class VerificationResource
     }
 
     /**
+     * Get sanitized document fields and source media for verification.
+     */
+    public function document(): ?array
+    {
+        if (! $this->verificationId) {
+            throw new \InvalidArgumentException('Verification ID is required');
+        }
+
+        $response = $this->client->makeRequest(
+            'GET',
+            "verifications/{$this->verificationId}/document"
+        );
+
+        return $response->json();
+    }
+
+    /**
      * Block the verification face for future AML checks.
      */
     public function blockFace(): ?array
