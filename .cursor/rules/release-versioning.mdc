@@ -1,0 +1,13 @@
+---
+description: Release versioning for proofage/laravel-client
+alwaysApply: true
+---
+
+# Release Versioning
+
+This Composer package uses git tags as the source of truth for package versions.
+
+- Do not add a `version` field to `composer.json`.
+- Prepare releases by committing the code changes, then creating a matching git tag such as `v0.2.4`.
+- Packagist/Composer resolves the package version from the git tag.
+- If `composer.json` changes, run `composer update --lock` and review the lockfile before release.
