@@ -252,6 +252,31 @@ class VerificationResourceTest extends TestCase
         });
     }
 
+    public function test_reused_client_does_not_duplicate_auth_headers_between_requests(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/workspace' => Http::response(['id' => 'ws_123']),
+            'api.test.com/v1/verifications/ver_123/blocked-face' => Http::response('', 204),
+        ]);
+
+        $client->workspace()->get();
+        $client->verifications('ver_123')->blockFace();
+
+        $expectedSignature = hash_hmac(
+            'sha256',
+            'POST/v1/verifications/ver_123/blocked-face',
+            'test-secret-key'
+        );
+
+        $blockedFaceRequest = Http::recorded()
+            ->map(fn (array $pair) => $pair[0])
+            ->first(fn ($request) => str_contains($request->url(), '/v1/verifications/ver_123/blocked-face'));
+
+        $this->assertNotNull($blockedFaceRequest);
+        $this->assertSame(['test-api-key'], $blockedFaceRequest->header('X-API-Key'));
+        $this->assertSame([$expectedSignature], $blockedFaceRequest->header('X-HMAC-Signature'));
+    }
+
     public function test_block_face_throws_when_no_id(): void
     {
         $client = $this->makeFakedClient([

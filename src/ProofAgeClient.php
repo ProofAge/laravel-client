@@ -20,8 +20,6 @@ class ProofAgeClient
 {
     protected array $config;
 
-    protected PendingRequest $http;
-
     public function __construct(array $config = [])
     {
         $this->config = array_merge([
@@ -31,7 +29,6 @@ class ProofAgeClient
         ], $config);
 
         $this->validateConfig();
-        $this->initializeHttpClient();
     }
 
     public function workspace(): WorkspaceResource
@@ -48,7 +45,7 @@ class ProofAgeClient
     {
         $url = $this->buildUrl($endpoint);
 
-        $request = $this->http->withHeaders([
+        $request = $this->newHttpRequest()->withHeaders([
             'X-API-Key' => $this->config['api_key'],
         ]);
 
@@ -98,9 +95,9 @@ class ProofAgeClient
         }
     }
 
-    protected function initializeHttpClient(): void
+    protected function newHttpRequest(): PendingRequest
     {
-        $this->http = Http::timeout($this->config['timeout'])
+        return Http::timeout($this->config['timeout'])
             ->retry(
                 times: $this->config['retry_attempts'],
                 sleepMilliseconds: $this->config['retry_delay'],
