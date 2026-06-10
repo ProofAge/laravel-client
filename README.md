@@ -4,6 +4,8 @@
 
 A Laravel package for integrating with the ProofAge API, featuring automatic HMAC authentication and a fluent interface.
 
+Full API reference: https://docs.proofage.xyz/api-reference.html#/
+
 ## About ProofAge
 
 ProofAge is an online age verification platform enabling websites to confirm users meet minimum age requirements through a hosted, privacy-focused KYC process — without server-side document handling. It supports alcohol/tobacco/cannabis commerce, adult content platforms, gambling sites, and age-restricted subscriptions.
@@ -82,6 +84,7 @@ Route::post('/webhooks/proof-age', [WebhookController::class, 'handleProofAgeWeb
 
 ```php
 use ProofAge\Laravel\Facades\ProofAge;
+use ProofAge\Laravel\Resources\VerificationResource;
 
 // Get workspace information
 $workspace = ProofAge::workspace()->get();
@@ -94,6 +97,22 @@ $verification = ProofAge::verifications()->create([
 
 // Get verification details
 $verification = ProofAge::verifications()->find('verification-id');
+
+// Get age estimation details
+$estimation = ProofAge::verifications('verification-id')->estimation();
+// [
+//     'verification_id' => '...',
+//     'attempt_id' => '...',
+//     'age_threshold' => [
+//         'minimum' => 18,
+//         'passed' => true,
+//         'confidence' => 0.98,
+//     ],
+//     'gender' => [
+//         'value' => VerificationResource::GENDER_FEMALE, // 0 = female, 1 = male
+//         'confidence' => 0.93,
+//     ],
+// ]
 
 // Accept consent for verification
 ProofAge::verifications('verification-id')->acceptConsent([

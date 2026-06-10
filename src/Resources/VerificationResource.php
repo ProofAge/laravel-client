@@ -6,6 +6,10 @@ use ProofAge\Laravel\ProofAgeClient;
 
 class VerificationResource
 {
+    public const GENDER_FEMALE = 0;
+
+    public const GENDER_MALE = 1;
+
     protected ProofAgeClient $client;
 
     protected ?string $verificationId;
@@ -123,6 +127,39 @@ class VerificationResource
         $response = $this->client->makeRequest(
             'GET',
             "verifications/{$this->verificationId}/document"
+        );
+
+        return $response->json();
+    }
+
+    /**
+     * Get sanitized age estimation and gender result for verification.
+     *
+     * Gender value mapping: GENDER_FEMALE (0) means female, GENDER_MALE (1) means male.
+     *
+     * @return array{
+     *     verification_id: string,
+     *     attempt_id: string|null,
+     *     age_threshold: array{
+     *         minimum: int|null,
+     *         passed: bool|null,
+     *         confidence: float|null
+     *     },
+     *     gender: array{
+     *         value: self::GENDER_FEMALE|self::GENDER_MALE|null,
+     *         confidence: float|null
+     *     }|null
+     * }|null
+     */
+    public function estimation(): ?array
+    {
+        if (! $this->verificationId) {
+            throw new \InvalidArgumentException('Verification ID is required');
+        }
+
+        $response = $this->client->makeRequest(
+            'GET',
+            "verifications/{$this->verificationId}/estimation"
         );
 
         return $response->json();

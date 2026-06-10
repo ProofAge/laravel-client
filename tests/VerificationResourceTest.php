@@ -5,6 +5,7 @@ namespace ProofAge\Laravel\Tests;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use ProofAge\Laravel\ProofAgeClient;
+use ProofAge\Laravel\Resources\VerificationResource;
 
 class VerificationResourceTest extends TestCase
 {
@@ -233,6 +234,49 @@ class VerificationResourceTest extends TestCase
         $this->expectExceptionMessage('Verification ID is required');
 
         $client->verifications()->document();
+    }
+
+    public function test_estimation_sends_get_to_estimation_endpoint(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_123/estimation' => Http::response([
+                'verification_id' => 'ver_123',
+                'attempt_id' => 'attempt_123',
+                'age_threshold' => [
+                    'minimum' => 18,
+                    'passed' => true,
+                    'confidence' => 0.98,
+                ],
+                'gender' => [
+                    'value' => 0,
+                    'confidence' => 0.93,
+                ],
+            ]),
+        ]);
+
+        $result = $client->verifications('ver_123')->estimation();
+
+        $this->assertSame('ver_123', $result['verification_id']);
+        $this->assertSame(18, $result['age_threshold']['minimum']);
+        $this->assertSame(VerificationResource::GENDER_FEMALE, $result['gender']['value']);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'GET'
+                && str_contains($request->url(), '/v1/verifications/ver_123/estimation')
+                && $request->hasHeader('X-HMAC-Signature');
+        });
+    }
+
+    public function test_estimation_throws_when_no_id(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/*' => Http::response([], 200),
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Verification ID is required');
+
+        $client->verifications()->estimation();
     }
 
     public function test_block_face_sends_post(): void
