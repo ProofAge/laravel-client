@@ -296,6 +296,33 @@ class VerificationResourceTest extends TestCase
         });
     }
 
+    public function test_block_face_sends_optional_body_data(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_123/blocked-face' => Http::response('', 204),
+        ]);
+
+        $result = $client->verifications('ver_123')->blockFace([
+            'reason' => 'text here',
+        ]);
+
+        $this->assertNull($result);
+
+        $expectedBody = json_encode(['reason' => 'text here']);
+        $expectedSignature = hash_hmac(
+            'sha256',
+            'POST/v1/verifications/ver_123/blocked-face'.$expectedBody,
+            'test-secret-key'
+        );
+
+        Http::assertSent(function ($request) use ($expectedBody, $expectedSignature) {
+            return $request->method() === 'POST'
+                && str_contains($request->url(), '/v1/verifications/ver_123/blocked-face')
+                && $request->body() === $expectedBody
+                && $request->header('X-HMAC-Signature') === [$expectedSignature];
+        });
+    }
+
     public function test_reused_client_does_not_duplicate_auth_headers_between_requests(): void
     {
         $client = $this->makeFakedClient([

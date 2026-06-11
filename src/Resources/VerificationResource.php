@@ -167,8 +167,10 @@ class VerificationResource
 
     /**
      * Block the verification face for future AML checks.
+     *
+     * Optionally pass body data such as ['reason' => 'text here'].
      */
-    public function blockFace(): ?array
+    public function blockFace(?array $data = null): ?array
     {
         if (! $this->verificationId) {
             throw new \InvalidArgumentException('Verification ID is required');
@@ -176,7 +178,8 @@ class VerificationResource
 
         $response = $this->client->makeRequest(
             'POST',
-            "verifications/{$this->verificationId}/blocked-face"
+            "verifications/{$this->verificationId}/blocked-face",
+            $data ?? []
         );
 
         return $response->json();
