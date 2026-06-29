@@ -95,6 +95,20 @@ class ApiContractTest extends TestCase
         );
     }
 
+    public function test_agents_doc_covers_every_endpoint(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__).'/AGENTS.md');
+
+        foreach (ApiContractMap::operations() as $name => $op) {
+            $token = $op['method'].' '.$op['path'];
+            $this->assertStringContainsString(
+                $token,
+                $doc,
+                "AGENTS.md is missing the [{$name}] endpoint line ({$token})."
+            );
+        }
+    }
+
     /** @return list<string> */
     private function responseProperties(string $path, string $method): array
     {

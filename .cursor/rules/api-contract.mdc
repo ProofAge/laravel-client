@@ -1,0 +1,16 @@
+---
+description: ProofAge Laravel client API request/response contract
+alwaysApply: true
+---
+
+# API contract
+
+The exact request/response shape of every `ProofAge` facade / `ProofAgeClient` method is in:
+
+- `AGENTS.md` (root) — endpoint-by-endpoint request/response/error contract.
+- `resources/openapi.json` — machine-readable OpenAPI 3.1 (endpoints + request bodies).
+- `@param` / `@return` array shapes on the methods in `src/Resources/`.
+
+Responses are authoritative in the PHPDoc `@return` shapes and `AGENTS.md` (the bundled
+spec's response side is incomplete by generator limitation). Keep all of these in sync; the
+drift guard is `tests/ApiContractTest.php` against `resources/openapi.json`.
