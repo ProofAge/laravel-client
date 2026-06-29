@@ -1,0 +1,14 @@
+# Keep src/, config/, resources/, README.md, AGENTS.md, INSTALLATION.md, LICENSE.md in the dist.
+/.github            export-ignore
+/.cursor            export-ignore
+/.idea              export-ignore
+/tests              export-ignore
+/docs               export-ignore
+/examples           export-ignore
+/build              export-ignore
+/scripts            export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/phpunit.xml        export-ignore
+/.phpunit.cache     export-ignore
+.DS_Store           export-ignore

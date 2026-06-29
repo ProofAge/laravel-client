@@ -45,6 +45,10 @@
             }
         }
     },
+    "scripts": {
+        "test": "phpunit",
+        "sync-spec": "@php scripts/sync-spec.php"
+    },
     "minimum-stability": "stable",
     "prefer-stable": true
 }
