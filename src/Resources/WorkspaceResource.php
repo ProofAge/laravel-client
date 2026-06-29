@@ -15,6 +15,20 @@ class WorkspaceResource
 
     /**
      * Get workspace information.
+     *
+     * @return array{
+     *     id: string,
+     *     name: string,
+     *     flow_type: string,
+     *     mode: string,
+     *     age_mode: string|null,
+     *     age_threshold: int|null,
+     *     verification_type: string,
+     *     redirect_url: string|null,
+     *     webhook_url: string|null,
+     *     allow_expired_documents: bool,
+     *     allow_duplicate_accounts: bool
+     * }|null
      */
     public function get(): ?array
     {
@@ -25,6 +39,8 @@ class WorkspaceResource
 
     /**
      * Get consent information.
+     *
+     * @return array{id: int, version: string, text_sha256: string, url: string}|null
      */
     public function getConsent(): ?array
     {

@@ -45,6 +45,15 @@
             }
         }
     },
+    "scripts": {
+        "test": "phpunit",
+        "sync-spec": "@php scripts/sync-spec.php"
+    },
+    "config": {
+        "audit": {
+            "block-insecure": false
+        }
+    },
     "minimum-stability": "stable",
     "prefer-stable": true
 }

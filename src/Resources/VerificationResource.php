@@ -2,6 +2,7 @@
 
 namespace ProofAge\Laravel\Resources;
 
+use Illuminate\Http\UploadedFile;
 use ProofAge\Laravel\ProofAgeClient;
 
 class VerificationResource
@@ -22,6 +23,26 @@ class VerificationResource
 
     /**
      * Create a new verification.
+     *
+     * @param  array{
+     *     fingerprint?: string,
+     *     callback_url?: string,
+     *     external_id?: string,
+     *     external_metadata?: array<string, mixed>,
+     *     metadata?: array<string, mixed>
+     * }  $data
+     * @return array{
+     *     id: string,
+     *     external_id: string|null,
+     *     external_metadata: array<string, mixed>|null,
+     *     redirect_url: string|null,
+     *     status: string,
+     *     reason: string|null,
+     *     consent_accepted_at: string|null,
+     *     created_at: string,
+     *     updated_at: string,
+     *     url: string
+     * }|null
      */
     public function create(array $data): ?array
     {
@@ -32,6 +53,18 @@ class VerificationResource
 
     /**
      * Get verification by ID.
+     *
+     * @return array{
+     *     id: string,
+     *     external_id: string|null,
+     *     external_metadata: array<string, mixed>|null,
+     *     redirect_url: string|null,
+     *     status: string,
+     *     reason: string|null,
+     *     consent_accepted_at: string|null,
+     *     created_at: string,
+     *     updated_at: string
+     * }|null
      */
     public function find(string $id): ?array
     {
@@ -42,6 +75,18 @@ class VerificationResource
 
     /**
      * Get current verification (if ID was set in constructor).
+     *
+     * @return array{
+     *     id: string,
+     *     external_id: string|null,
+     *     external_metadata: array<string, mixed>|null,
+     *     redirect_url: string|null,
+     *     status: string,
+     *     reason: string|null,
+     *     consent_accepted_at: string|null,
+     *     created_at: string,
+     *     updated_at: string
+     * }|null
      */
     public function get(): ?array
     {
@@ -54,6 +99,9 @@ class VerificationResource
 
     /**
      * Accept consent for verification.
+     *
+     * @param  array{consent_version_id: int, text_sha256: string}  $data
+     * @return array{consent_version_id: int, consent_accepted_at: string}|null
      */
     public function acceptConsent(array $data): ?array
     {
@@ -72,6 +120,21 @@ class VerificationResource
 
     /**
      * Upload media for verification.
+     *
+     * `file` is sent as multipart. `side` and `document` are required when `type` is
+     * `document`. `capture_resolution` and `device_info` are JSON-encoded strings.
+     *
+     * @param  array{
+     *     file: UploadedFile|string,
+     *     type: string,
+     *     side?: string,
+     *     document?: string,
+     *     fingerprint?: string,
+     *     head_turn_step?: int,
+     *     capture_resolution?: string,
+     *     device_info?: string
+     * }  $data
+     * @return array{message: string}|null
      */
     public function uploadMedia(array $data): ?array
     {
@@ -100,6 +163,8 @@ class VerificationResource
 
     /**
      * Submit verification for processing.
+     *
+     * @return array{message: string}|null
      */
     public function submit(): ?array
     {
@@ -117,6 +182,15 @@ class VerificationResource
 
     /**
      * Get sanitized document fields and source media for verification.
+     *
+     * Media are ordered selfie, document_front, document_back; `signed_url` values expire
+     * at `meta.signed_url_expires_at`.
+     *
+     * @return array{
+     *     document: array{fields: array{first_name: string|null, last_name: string|null, date_of_birth: string|null, document_number: string|null}},
+     *     media: list<array{id: string, type: string, signed_url: string|null, expires_at: string}>,
+     *     meta: array{attempt_id: string|null, signed_url_ttl_seconds: int, signed_url_expires_at: string}
+     * }|null
      */
     public function document(): ?array
     {
@@ -168,7 +242,10 @@ class VerificationResource
     /**
      * Block the verification face for future AML checks.
      *
-     * Optionally pass body data such as ['reason' => 'text here'].
+     * The API responds 204 No Content, so this returns null.
+     *
+     * @param  array{reason?: string}|null  $data
+     * @return null
      */
     public function blockFace(?array $data = null): ?array
     {

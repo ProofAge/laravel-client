@@ -282,6 +282,12 @@ Additional workspaces only need `api_key` and `secret_key`. If a workspace conne
 - `verifications(string $id)->acceptConsent(array $data)` - Accept consent
 - `verifications(string $id)->uploadMedia(array $data)` - Upload media files
 - `verifications(string $id)->submit()` - Submit verification for processing
+- `verifications(string $id)->document()` - Get sanitized document fields and source media
+- `verifications(string $id)->estimation()` - Get age-threshold and gender estimation
+- `verifications(string $id)->blockFace(?array $data)` - Block the verification face for AML
+
+Every method's exact request and response shape is documented in `AGENTS.md`, in the
+`@param`/`@return` PHPDoc on `src/Resources/`, and in the bundled `resources/openapi.json`.
 
 ## Error Handling
 
