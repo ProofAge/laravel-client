@@ -67,26 +67,49 @@ From it, the package carries the contract in three co-located layers:
    payload. It points to the bundled `resources/openapi.json` and the README. The existing
    `.cursor/` rules reference it so Cursor agents pick it up.
 
+### Responses: authored shapes are the source of truth (Scramble limitation)
+
+Decision (2026-06-29): **the package's authored `@return` array-shapes + `AGENTS.md` are the
+authoritative response contract**, pinned by the package's existing HTTP-fake tests. The
+bundled `openapi.json` is the source of truth for **endpoints and request bodies**, not
+responses.
+
+Reason: the app's Scramble version (`dedoc/scramble ^0.13`) does **not** honor the controllers'
+`@response` PHPDoc and cannot introspect the JsonResource `toArray()` for most endpoints. The
+regenerated spec types the `2xx` bodies of `create`, `acceptConsent`, `submit`, `uploadMedia`,
+and `GET /consent` as `{"type":"integer","const":200}` (it captured the status code), and
+`GET /verifications/{id}` as an empty `VerificationResource` (`{"type":"array"}`). Only
+`GET /workspace`, `GET …/estimation`, and `GET …/document` get correct response schemas.
+Fixing Scramble is explicitly out of scope (it would be uncertain app-side effort); the
+authored shapes carry the response contract instead.
+
 ### The "synchronized" guarantee — a drift test
 
-A Pest contract test, `tests/Feature/ApiContractTest.php`, loads the bundled
-`resources/openapi.json` and asserts three things:
+A PHPUnit contract test, `tests/ApiContractTest.php` (this package uses PHPUnit + Orchestra
+Testbench, **not** Pest), loads the bundled `resources/openapi.json` and asserts:
 
 1. **Endpoint existence** — every `(verb, path)` that an SDK resource method targets exists
    as a path/operation in the spec. Catches renamed or removed endpoints.
 2. **Endpoint coverage** — every operation in the spec is reachable by some SDK method.
    Catches "the app added an endpoint the SDK is missing" (the exact `estimation` gap that
    already exists in the Node client).
-3. **Field parity** — for each method, the set of field names declared in its `@return`
-   (and `@param`) array-shape PHPDoc matches the property names in the spec's request /
-   `2xx` response schema for that operation. Catches added, removed, or renamed fields.
+3. **Request field parity** — for every operation, the request field set declared in the
+   contract map equals the spec's request-body schema property set. Scramble captures these
+   reliably (from FormRequests), so this covers all write endpoints.
+4. **Response field parity (reliable endpoints only)** — for the operations whose spec
+   response schema exposes properties (`getWorkspace`, `getVerificationEstimation`,
+   `getVerificationDocument`), assert the contract map's top-level response field set equals
+   the spec's. For every other operation the response shape is pinned by the package's
+   existing HTTP-fake tests + the authored `@return` PHPDoc, **not** the spec. The test
+   skips response parity for operations whose spec schema has no enumerable properties (and
+   records which ones were skipped) so it never false-fails on Scramble's gaps.
 
 To keep the test robust and avoid fragile free-form PHPDoc parsing, the SDK's method→
 operation mapping and expected field sets are declared once in a small structured map
-(a `tests/Support/ApiContractMap.php` array, or a `protected static` map on the test). The
+(`tests/Support/ApiContractMap.php`, namespace `ProofAge\Laravel\Tests\Support`). The
 PHPDoc array-shapes are authored to match that map. When the bundled spec is refreshed from
 the app, the test fails and names exactly which endpoint/field diverged, so the maintainer
-updates the PHPDoc + `AGENTS.md` in lockstep.
+updates the map + PHPDoc + `AGENTS.md` in lockstep.
 
 > **Authoritative shapes.** The field shapes in the appendix below were read from the app's
 > API Resources on 2026-06-29 and are the implementation target. During implementation they
@@ -109,11 +132,13 @@ When the API changes:
 ## Files to add / change (in `proofage-laravel-client`)
 
 **Add**
-- `resources/openapi.json` — bundled copy of the app spec (current, includes `estimation`).
+- `resources/openapi.json` — bundled copy of the app spec (regenerated, includes `estimation`).
 - `AGENTS.md` — AI-facing endpoint contract (see layer 3).
-- `tests/Feature/ApiContractTest.php` — the drift test.
-- `tests/Support/ApiContractMap.php` (or inline map) — method→operation→fields map.
-- `composer.json` script `sync-spec` (copy spec from the app path). Ensure
+- `tests/ApiContractTest.php` — the drift test (flat in `tests/`, matching package convention).
+- `tests/Support/ApiContractMap.php` — method→operation→fields map (`ProofAge\Laravel\Tests\Support`).
+- `composer.json` `scripts` block with `test` and `sync-spec` (there is none today; the
+  README's `composer test` currently has no script behind it). `sync-spec` copies the spec
+  from the app path. Ensure
   `resources/openapi.json` is **not** `export-ignore`d in `.gitattributes` (so it installs
   into consumers' `vendor/proofage/laravel-client/resources/`), while `tests/`, `docs/`,
   and `examples/` stay `export-ignore`d as usual. The drift test reads `resources/openapi.json`
@@ -122,24 +147,31 @@ When the API changes:
 **Change**
 - `src/Resources/VerificationResource.php` — add `@param`/`@return` array shapes to
   `create`, `find`/`get`, `acceptConsent`, `uploadMedia`, `submit`, `document`,
-  `estimation` (already done), `blockFace`.
+  `blockFace`. (`estimation` already has its `@return` shape.)
 - `src/Resources/WorkspaceResource.php` — add `@return` array shapes to `get`, `getConsent`.
 - `README.md` — extend "API Methods" to include `document()`, `estimation()`,
   `blockFace()`; add an "AI agents / contract" pointer to `AGENTS.md` and the bundled spec;
   document the update workflow.
 - `.cursor/` rules — reference `AGENTS.md`.
 
+> All listed methods already exist in `src/` with passing HTTP-fake tests (the package has
+> recent `Add verification estimation endpoint` / `Allow blockFace request body data`
+> commits). This pass adds the **contract layers** around them; it does not add methods.
+
 **App-side (one minimal touch, produces the source artifact)**
-- Regenerate `developer-docs/public/openapi.json` and confirm `GET /verifications/{verification}/estimation`
-  is present. If Scramble still omits it, add the missing response annotation on
-  `VerificationController@estimation` so the spec is complete. No app behavior changes.
+- Regenerate `developer-docs/public/openapi.json` (`cd developer-docs && npm run generate:openapi`).
+  Verified 2026-06-29: the regenerated spec already includes
+  `GET /verifications/{verification}/estimation` — the committed copy was just stale. No
+  annotation or behavior changes needed.
 
 ## Testing
 
-- New `tests/Feature/ApiContractTest.php` (Pest) implementing the three drift assertions.
-- Existing test suite stays green (`composer test`).
-- The contract map doubles as coverage: each documented method/field is asserted against
-  the bundled spec.
+- New `tests/ApiContractTest.php` (PHPUnit, `extends ProofAge\Laravel\Tests\TestCase`)
+  implementing the four drift assertions above.
+- Existing test suite stays green (`vendor/bin/phpunit` / `composer test`).
+- Response shapes for endpoints Scramble can't describe are pinned by the existing
+  `VerificationResourceTest` / `WorkspaceResourceTest` HTTP-fake tests; the contract map +
+  drift test cover endpoints, request fields, and the three reliable response schemas.
 
 ## Node client follow-up (out of scope here, same pattern)
 
