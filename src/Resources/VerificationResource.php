@@ -2,6 +2,7 @@
 
 namespace ProofAge\Laravel\Resources;
 
+use Illuminate\Http\UploadedFile;
 use ProofAge\Laravel\ProofAgeClient;
 
 class VerificationResource
@@ -124,7 +125,7 @@ class VerificationResource
      * `document`. `capture_resolution` and `device_info` are JSON-encoded strings.
      *
      * @param  array{
-     *     file: \Illuminate\Http\UploadedFile|string,
+     *     file: UploadedFile|string,
      *     type: string,
      *     side?: string,
      *     document?: string,
