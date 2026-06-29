@@ -62,8 +62,8 @@ Response: `204 No Content` (method returns `null`).
 
 ## Enums
 
-- `status`: `created`, `started`, `submitted`, `resubmission_requested`, `approved`, `declined`, `abandoned`, `expired`, `review`, `documents_required`. See `ProofAge\Laravel\Enums\VerificationStatus`.
-- `reason` (on declined / resubmission_requested): dotted codes from the server's reason catalog, e.g. `aml.blocklist.face_match`, `document.face.mismatch`, `verification.age_threshold.failed`. See `ProofAge\Laravel\Enums\WebhookReason`.
+- `status`: one of `created`, `started`, `submitted`, `resubmission_requested`, `approved`, `declined`, `abandoned`, `expired`, `review` (the `ProofAge\Laravel\Enums\VerificationStatus` cases), or `documents_required` — surfaced from the latest attempt's state (an `AttemptStatus`), not a `VerificationStatus` case. Map the `status` field with `VerificationStatus::tryFrom()` and handle `documents_required` explicitly.
+- `reason` (on `declined` / `resubmission_requested`): dotted codes from the server's reason catalog — illustrative examples: `aml.blocklist.face_match`, `document.face.mismatch`, `verification.age_threshold.failed`. `ProofAge\Laravel\Enums\WebhookReason` models only the AML blocklist codes; treat `reason` as an open string.
 
 ## Outbound webhook (ProofAge → your `callback_url` / workspace webhook URL)
 

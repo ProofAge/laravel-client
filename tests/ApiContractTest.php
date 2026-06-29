@@ -51,6 +51,7 @@ class ApiContractTest extends TestCase
     public function test_request_fields_match_the_spec(): void
     {
         foreach (ApiContractMap::operations() as $name => $op) {
+            // Limitation (mirrors the response-parity skip): a new request body appearing on a currently body-less endpoint is not caught here — refresh the contract map when adding one.
             if ($op['request'] === []) {
                 continue;
             }

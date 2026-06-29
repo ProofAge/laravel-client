@@ -12,4 +12,5 @@ enum VerificationStatus: string
     case DECLINED = 'declined';
     case ABANDONED = 'abandoned';
     case EXPIRED = 'expired';
+    case REVIEW = 'review';
 }

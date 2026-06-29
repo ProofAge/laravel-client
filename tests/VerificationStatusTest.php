@@ -17,5 +17,6 @@ class VerificationStatusTest extends TestCase
         $this->assertSame('declined', VerificationStatus::DECLINED->value);
         $this->assertSame('abandoned', VerificationStatus::ABANDONED->value);
         $this->assertSame('expired', VerificationStatus::EXPIRED->value);
+        $this->assertSame('review', VerificationStatus::REVIEW->value);
     }
 }
