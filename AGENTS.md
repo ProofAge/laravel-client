@@ -90,7 +90,6 @@ Body:
 
 ## Keeping this in sync
 
-`resources/openapi.json` is generated from the app (`composer run sync-spec`). The drift
-guard is `tests/ApiContractTest.php`. When the API changes, refresh the spec, run the tests,
-and update `tests/Support/ApiContractMap.php`, the `@param`/`@return` shapes, and this file
-together.
+This contract is drift-tested against `resources/openapi.json` via `tests/ApiContractTest.php`,
+so it stays aligned with the API. Maintainers refreshing it after an API change: see the SDK
+contract-sync runbook in the ProofAge app repo (the single source of truth for all SDKs).

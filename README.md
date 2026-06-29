@@ -380,17 +380,6 @@ composer test
 | **Laravel** | this repo | Laravel age verification client — HMAC-signed API calls, webhook handling, middleware for age-restricted routes |
 | **Next.js** | [ProofAge/demo](https://github.com/ProofAge/demo) | Full-stack age verification demo with JS SDK, server routes, and webhook receiver |
 
-## Keeping the API contract in sync
-
-The package bundles a machine-readable spec at `resources/openapi.json` and a drift test
-(`tests/ApiContractTest.php`) that fails if the SDK surface diverges from it. To refresh
-after an API change:
-
-1. In the app, regenerate the spec: `cd developer-docs && npm run generate:openapi`.
-2. In this package: `composer run sync-spec` (copies the spec into `resources/`).
-3. Run `composer test`. If the drift test fails, update `tests/Support/ApiContractMap.php`,
-   the `@param`/`@return` shapes in `src/Resources/`, and `AGENTS.md` to match.
-
 ## License
 
 The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
