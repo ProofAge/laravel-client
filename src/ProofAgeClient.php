@@ -26,6 +26,7 @@ class ProofAgeClient
             'timeout' => 30,
             'retry_attempts' => 3,
             'retry_delay' => 1000,
+            'download_retry_attempts' => 1,
         ], $config);
 
         $this->validateConfig();
@@ -96,7 +97,7 @@ class ProofAgeClient
         $url = $this->buildUrl($endpoint);
         $signature = $this->generateHmacSignature($method, $endpoint, '');
 
-        $request = $this->newHttpRequest()->withHeaders([
+        $request = $this->newDownloadHttpRequest()->withHeaders([
             'X-API-Key' => $this->config['api_key'],
             'X-HMAC-Signature' => $signature,
             'Accept' => '*/*',
@@ -148,6 +149,31 @@ class ProofAgeClient
                 throw: false,
             )
             ->acceptJson();
+    }
+
+    /**
+     * Retry policy for downloads, deliberately different from newHttpRequest().
+     *
+     * A download runs from a queue whose own backoff owns the wait, so an
+     * in-process retry is not free: on 429 it spends the same per-minute budget
+     * that just refused us, and any sleep blocks the worker rather than
+     * releasing the job. Honouring Retry-After here would block it for longer
+     * still. So HTTP statuses are never retried — the caller's queue decides —
+     * and only a genuine connection failure is, if the operator raises
+     * download_retry_attempts above the default of 1 (no retries at all).
+     *
+     * The interactive path keeps its 3 quick retries: there a user is waiting
+     * and there is no queue to hand the wait to.
+     */
+    protected function newDownloadHttpRequest(): PendingRequest
+    {
+        return Http::timeout($this->config['timeout'])
+            ->retry(
+                times: max(1, (int) ($this->config['download_retry_attempts'] ?? 1)),
+                sleepMilliseconds: $this->config['retry_delay'],
+                when: fn (Exception $exception) => $exception instanceof ConnectionException,
+                throw: false,
+            );
     }
 
     protected function buildUrl(string $endpoint): string

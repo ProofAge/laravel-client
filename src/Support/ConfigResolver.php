@@ -21,6 +21,7 @@ class ConfigResolver
             'timeout' => config("{$configPrefix}.timeout") ?? config('proofage.timeout'),
             'retry_attempts' => config("{$configPrefix}.retry_attempts") ?? config('proofage.retry_attempts'),
             'retry_delay' => config("{$configPrefix}.retry_delay") ?? config('proofage.retry_delay'),
+            'download_retry_attempts' => config("{$configPrefix}.download_retry_attempts") ?? config('proofage.download_retry_attempts') ?? 1,
             'webhook_tolerance' => config("{$configPrefix}.webhook_tolerance") ?? config('proofage.webhook_tolerance') ?? 300,
         ];
     }

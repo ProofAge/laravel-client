@@ -54,7 +54,7 @@ Response: `{ document: { fields: { first_name: string|null, last_name: string|nu
 
 ### GET /verifications/{verification}/media/{media} — `ProofAge::verifications($id)->downloadMedia($mediaId)`
 Request: none. `{media}` is `media[].id` from document().
-Response: the image bytes, `Content-Type` from the file (e.g. `image/jpeg`). `downloadMedia()` returns a PSR-7 `StreamInterface`; `downloadMediaTo($mediaId, $path)` streams to disk and returns the path. Error: `404 { error: { code: "MEDIA_NOT_FOUND", message } }` when the media is purged, past retention, or not part of this verification. Prefer this over `media[].signed_url`, which points at Google Cloud Storage and is unreachable from networks Google geoblocks. `url` is null for exactly the media whose `signed_url` is null (purged or past retention), so absence reads the same either way.
+Response: the image bytes, `Content-Type` from the file (e.g. `image/jpeg`). `downloadMedia()` returns a PSR-7 `StreamInterface`; `downloadMediaTo($mediaId, $path)` streams to disk and returns the path. Downloads do not retry HTTP failures — 429 included — because they run from a queue whose backoff owns the wait; raise `PROOFAGE_DOWNLOAD_RETRY_ATTEMPTS` (default 1) to retry connection failures only. Error: `404 { error: { code: "MEDIA_NOT_FOUND", message } }` when the media is purged, past retention, or not part of this verification. Prefer this over `media[].signed_url`, which points at Google Cloud Storage and is unreachable from networks Google geoblocks. `url` is null for exactly the media whose `signed_url` is null (purged or past retention), so absence reads the same either way.
 
 ### GET /verifications/{verification}/estimation — `ProofAge::verifications($id)->estimation()`
 Request: none.

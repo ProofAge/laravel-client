@@ -276,6 +276,61 @@ class VerificationResourceTest extends TestCase
         unlink($path);
     }
 
+    public function test_download_media_does_not_retry_a_rate_limit(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_1/media/med_1' => Http::sequence()
+                ->push(['error' => ['code' => 'RATE_LIMIT']], 429)
+                ->push('bytes', 200),
+        ]);
+
+        try {
+            $client->verifications('ver_1')->downloadMedia('med_1');
+            $this->fail('Expected the 429 to surface instead of being retried.');
+        } catch (\ProofAge\Laravel\Exceptions\ProofAgeException $exception) {
+            $this->assertSame(429, $exception->getCode());
+        }
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_interactive_requests_still_retry_a_rate_limit(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_1/document' => Http::sequence()
+                ->push(['error' => ['code' => 'RATE_LIMIT']], 429)
+                ->push(['document' => ['fields' => []], 'media' => [], 'meta' => []], 200),
+        ]);
+
+        $result = $client->verifications('ver_1')->document();
+
+        $this->assertIsArray($result);
+        Http::assertSentCount(2);
+    }
+
+    public function test_download_retry_attempts_can_be_raised_for_connection_failures(): void
+    {
+        Http::fake([
+            'api.test.com/v1/verifications/ver_1/media/med_1' => Http::sequence()
+                ->pushFailedConnection()
+                ->push('bytes', 200),
+        ]);
+
+        $client = new ProofAgeClient([
+            'api_key' => 'test-api-key',
+            'secret_key' => 'test-secret-key',
+            'base_url' => 'https://api.test.com',
+            'version' => 'v1',
+            'retry_delay' => 0,
+            'download_retry_attempts' => 2,
+        ]);
+
+        $body = $client->verifications('ver_1')->downloadMedia('med_1');
+
+        $this->assertSame('bytes', (string) $body);
+        Http::assertSentCount(2);
+    }
+
     public function test_download_media_throws_when_no_id(): void
     {
         $client = $this->makeFakedClient([]);
