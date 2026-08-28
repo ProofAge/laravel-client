@@ -2,8 +2,10 @@
 
 namespace ProofAge\Laravel\Tests;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\ProofAgeClient;
 use ProofAge\Laravel\Resources\VerificationResource;
 
@@ -287,7 +289,7 @@ class VerificationResourceTest extends TestCase
         try {
             $client->verifications('ver_1')->downloadMedia('med_1');
             $this->fail('Expected the 429 to surface instead of being retried.');
-        } catch (\ProofAge\Laravel\Exceptions\ProofAgeException $exception) {
+        } catch (ProofAgeException $exception) {
             $this->assertSame(429, $exception->getCode());
         }
 
@@ -310,11 +312,18 @@ class VerificationResourceTest extends TestCase
 
     public function test_download_retry_attempts_can_be_raised_for_connection_failures(): void
     {
-        Http::fake([
-            'api.test.com/v1/verifications/ver_1/media/med_1' => Http::sequence()
-                ->pushFailedConnection()
-                ->push('bytes', 200),
-        ]);
+        // Built by hand rather than with Http::sequence()->pushFailedConnection(),
+        // which does not exist before Laravel 11.
+        $calls = 0;
+        Http::fake(function () use (&$calls) {
+            $calls++;
+
+            if ($calls === 1) {
+                throw new ConnectionException('Connection timed out');
+            }
+
+            return Http::response('bytes', 200);
+        });
 
         $client = new ProofAgeClient([
             'api_key' => 'test-api-key',
@@ -327,8 +336,10 @@ class VerificationResourceTest extends TestCase
 
         $body = $client->verifications('ver_1')->downloadMedia('med_1');
 
+        // Counted in the fake rather than with Http::assertSentCount(): a fake
+        // that throws is never recorded as sent, so only the retry shows up there.
         $this->assertSame('bytes', (string) $body);
-        Http::assertSentCount(2);
+        $this->assertSame(2, $calls);
     }
 
     public function test_download_media_throws_when_no_id(): void
