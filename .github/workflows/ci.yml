@@ -10,11 +10,29 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Support policy: we test what upstream still supports, nothing more.
+    #
+    #   * A Laravel version leaves the matrix when its SECURITY window closes,
+    #     not when its bug-fix window does — running a security-only release in
+    #     production is legitimate.
+    #   * A PHP version leaves on the same rule: end of its security window.
+    #   * A new PHP version joins the day Laravel declares support for it, not
+    #     the day PHP releases it.
+    #
+    # The only exception is a known consumer pinned to an end-of-life version.
+    # Record it here with a date if that ever happens, so it does not become
+    # drift.
+    #
+    # Reviewed 2026-08-28 (laravel.com/docs/releases, php.net/supported-versions):
+    #   Laravel 11  security ended 2026-03-12  -> dropped
+    #   Laravel 12  security ends  2027-02-24  -> PHP 8.2-8.5
+    #   Laravel 13  security ends  2028-03-17  -> PHP 8.3-8.5
+    #   PHP 8.2     security ends  2026-12-31  -> revisit then
     strategy:
       fail-fast: false
       matrix:
-        php-version: ['8.2', '8.3', '8.4']
-        laravel: ['11.*', '12.*', '13.*']
+        php-version: ['8.2', '8.3', '8.4', '8.5']
+        laravel: ['12.*', '13.*']
         exclude:
           # Laravel 13 requires PHP 8.3.
           - php-version: '8.2'
@@ -54,7 +72,7 @@ jobs:
       run: mkdir -p build/logs
 
     - name: Run Laravel Pint
-      if: matrix.php-version == '8.4' && matrix.laravel == '13.*'
+      if: matrix.php-version == '8.5' && matrix.laravel == '13.*'
       run: vendor/bin/pint --test
 
     - name: Run tests
@@ -62,7 +80,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
-      if: matrix.php-version == '8.4' && matrix.laravel == '13.*'
+      if: matrix.php-version == '8.5' && matrix.laravel == '13.*'
       with:
         file: ./build/logs/clover.xml
         fail_ci_if_error: false
