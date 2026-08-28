@@ -224,6 +224,67 @@ class VerificationResourceTest extends TestCase
         });
     }
 
+    public function test_download_media_streams_bytes_from_the_media_endpoint(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_1/media/med_1' => Http::response(
+                'binary-image-bytes',
+                200,
+                ['Content-Type' => 'image/jpeg'],
+            ),
+        ]);
+
+        $body = $client->verifications('ver_1')->downloadMedia('med_1');
+
+        $this->assertSame('binary-image-bytes', (string) $body);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'GET'
+                && str_contains($request->url(), '/v1/verifications/ver_1/media/med_1')
+                && $request->hasHeader('X-API-Key')
+                && $request->hasHeader('X-HMAC-Signature');
+        });
+    }
+
+    public function test_download_media_signs_the_path_with_an_empty_body(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_1/media/med_1' => Http::response('bytes', 200),
+        ]);
+
+        $client->verifications('ver_1')->downloadMedia('med_1');
+
+        $expected = hash_hmac('sha256', 'GET/v1/verifications/ver_1/media/med_1', 'test-secret-key');
+
+        Http::assertSent(fn ($request) => $request->header('X-HMAC-Signature')[0] === $expected);
+    }
+
+    public function test_download_media_to_writes_the_file_to_disk(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_1/media/med_1' => Http::response('binary-image-bytes', 200),
+        ]);
+
+        $path = sys_get_temp_dir().'/proofage-media-'.uniqid().'.jpg';
+
+        $returned = $client->verifications('ver_1')->downloadMediaTo('med_1', $path);
+
+        $this->assertSame($path, $returned);
+        $this->assertFileExists($path);
+        $this->assertSame('binary-image-bytes', file_get_contents($path));
+
+        unlink($path);
+    }
+
+    public function test_download_media_throws_when_no_id(): void
+    {
+        $client = $this->makeFakedClient([]);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $client->verifications()->downloadMedia('med_1');
+    }
+
     public function test_document_throws_when_no_id(): void
     {
         $client = $this->makeFakedClient([

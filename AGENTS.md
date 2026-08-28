@@ -50,7 +50,11 @@ Response: `{ message: string }`. Error: `422 { error: { code, message } }`.
 
 ### GET /verifications/{verification}/document — `ProofAge::verifications($id)->document()`
 Request: none.
-Response: `{ document: { fields: { first_name: string|null, last_name: string|null, date_of_birth: string|null (YYYY-MM-DD), document_number: string|null } }, media: [ { id: string, type: "selfie"|"document_front"|"document_back", signed_url: string|null, expires_at: string } ], meta: { attempt_id: string|null, signed_url_ttl_seconds: int, signed_url_expires_at: string } }`
+Response: `{ document: { fields: { first_name: string|null, last_name: string|null, date_of_birth: string|null (YYYY-MM-DD), document_number: string|null } }, media: [ { id: string, type: "selfie"|"document_front"|"document_back", url: string|null, signed_url: string|null, expires_at: string } ], meta: { attempt_id: string|null, signed_url_ttl_seconds: int, signed_url_expires_at: string } }`
+
+### GET /verifications/{verification}/media/{media} — `ProofAge::verifications($id)->downloadMedia($mediaId)`
+Request: none. `{media}` is `media[].id` from document().
+Response: the image bytes, `Content-Type` from the file (e.g. `image/jpeg`). `downloadMedia()` returns a PSR-7 `StreamInterface`; `downloadMediaTo($mediaId, $path)` streams to disk and returns the path. Error: `404 { error: { code: "MEDIA_NOT_FOUND", message } }` when the media is purged, past retention, or not part of this verification. Prefer this over `media[].signed_url`, which points at Google Cloud Storage and is unreachable from networks Google geoblocks. `url` is null for exactly the media whose `signed_url` is null (purged or past retention), so absence reads the same either way.
 
 ### GET /verifications/{verification}/estimation — `ProofAge::verifications($id)->estimation()`
 Request: none.

@@ -2,8 +2,10 @@
 
 namespace ProofAge\Laravel\Resources;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use ProofAge\Laravel\ProofAgeClient;
+use Psr\Http\Message\StreamInterface;
 
 class VerificationResource
 {
@@ -183,12 +185,14 @@ class VerificationResource
     /**
      * Get sanitized document fields and source media for verification.
      *
-     * Media are ordered selfie, document_front, document_back; `signed_url` values expire
-     * at `meta.signed_url_expires_at`.
+     * Media are ordered selfie, document_front, document_back. Prefer `url`, which
+     * streams the bytes from the ProofAge API via downloadMedia(); `signed_url` is a
+     * presigned Google Cloud Storage URL that expires at `meta.signed_url_expires_at`
+     * and is unreachable from networks Google geoblocks.
      *
      * @return array{
      *     document: array{fields: array{first_name: string|null, last_name: string|null, date_of_birth: string|null, document_number: string|null}},
-     *     media: list<array{id: string, type: string, signed_url: string|null, expires_at: string}>,
+     *     media: list<array{id: string, type: string, url: string|null, signed_url: string|null, expires_at: string}>,
      *     meta: array{attempt_id: string|null, signed_url_ttl_seconds: int, signed_url_expires_at: string}
      * }|null
      */
@@ -204,6 +208,54 @@ class VerificationResource
         );
 
         return $response->json();
+    }
+
+    /**
+     * Download one media file belonging to the verification.
+     *
+     * Streams the bytes from the ProofAge API under the same API key and HMAC
+     * signature as every other call. Prefer this over `media[].signed_url` from
+     * document(): the presigned storage URL points at Google, and a caller whose
+     * network Google refuses cannot fetch it at all.
+     *
+     * The media ID is `media[].id` from document(). Media that has been purged,
+     * has passed its retention window, or does not belong to this verification
+     * answers 404, which surfaces as a ProofAgeException.
+     *
+     * @param  string  $mediaId  Media UUID from document()
+     * @return StreamInterface Lazily-read body; do not assume it fits in memory
+     */
+    public function downloadMedia(string $mediaId): StreamInterface
+    {
+        return $this->mediaResponse($mediaId)->toPsrResponse()->getBody();
+    }
+
+    /**
+     * Download one media file straight to disk.
+     *
+     * Never holds the whole file in memory, so it stays safe as media grows.
+     *
+     * @param  string  $path  Absolute destination path
+     * @return string The path written to
+     */
+    public function downloadMediaTo(string $mediaId, string $path): string
+    {
+        $this->mediaResponse($mediaId, $path);
+
+        return $path;
+    }
+
+    private function mediaResponse(string $mediaId, ?string $sink = null): Response
+    {
+        if (! $this->verificationId) {
+            throw new \InvalidArgumentException('Verification ID is required');
+        }
+
+        return $this->client->makeStreamedRequest(
+            'GET',
+            "verifications/{$this->verificationId}/media/{$mediaId}",
+            $sink,
+        );
     }
 
     /**

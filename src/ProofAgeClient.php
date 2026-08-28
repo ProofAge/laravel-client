@@ -80,6 +80,35 @@ class ProofAgeClient
         return $this->handleResponse($response);
     }
 
+    /**
+     * Fetch a binary endpoint without JSON decoding.
+     *
+     * The public API signs GET requests over method + path with an empty body,
+     * which is exactly what a bodyless GET sends, so signing is unchanged. What
+     * differs from makeRequest() is that the response body is never decoded and,
+     * unless a $sink is given, never buffered in memory.
+     *
+     * @param  string|null  $sink  Absolute path to stream the body into. When null the
+     *                             body is returned as a lazily-read PSR-7 stream.
+     */
+    public function makeStreamedRequest(string $method, string $endpoint, ?string $sink = null): Response
+    {
+        $url = $this->buildUrl($endpoint);
+        $signature = $this->generateHmacSignature($method, $endpoint, '');
+
+        $request = $this->newHttpRequest()->withHeaders([
+            'X-API-Key' => $this->config['api_key'],
+            'X-HMAC-Signature' => $signature,
+            'Accept' => '*/*',
+        ]);
+
+        $request = $sink === null
+            ? $request->withOptions(['stream' => true])
+            : $request->sink($sink);
+
+        return $this->handleResponse($request->send($method, $url));
+    }
+
     protected function validateConfig(): void
     {
         if (empty($this->config['api_key'])) {

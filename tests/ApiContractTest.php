@@ -90,7 +90,7 @@ class ApiContractTest extends TestCase
 
         sort($checked);
         $this->assertSame(
-            ['verifications.document', 'verifications.estimation', 'workspace.get'],
+            ['verifications.document', 'verifications.estimation', 'verifications.find', 'workspace.get'],
             $checked,
             'The set of spec-describable response endpoints changed. If the generator improved, extend response parity coverage.'
         );

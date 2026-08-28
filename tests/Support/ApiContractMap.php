@@ -35,16 +35,16 @@ class ApiContractMap
             'verifications.find' => [
                 'method' => 'GET', 'path' => '/verifications/{verification}', 'operationId' => 'getVerification',
                 'request' => [],
-                'response' => ['id', 'external_id', 'external_metadata', 'redirect_url', 'status', 'reason', 'consent_accepted_at', 'created_at', 'updated_at'],
+                'response' => ['id', 'external_id', 'external_metadata', 'redirect_url', 'status', 'reason', 'consent_accepted_at', 'created_at', 'updated_at', 'duplicate_check'],
             ],
             'verifications.acceptConsent' => [
                 'method' => 'POST', 'path' => '/verifications/{verification}/consent', 'operationId' => 'acceptConsent',
-                'request' => ['consent_version_id', 'text_sha256'],
+                'request' => ['consent_version_id', 'text_sha256', 'device', 'in_app_browser', 'in_iframe', 'referrer', 'camera_permission', 'camera_policy_allowed'],
                 'response' => ['consent_version_id', 'consent_accepted_at'],
             ],
             'verifications.uploadMedia' => [
                 'method' => 'POST', 'path' => '/verifications/{verification}/media', 'operationId' => 'uploadMedia',
-                'request' => ['file', 'type', 'side', 'document', 'fingerprint', 'head_turn_step', 'capture_resolution', 'device_info'],
+                'request' => ['file', 'type', 'side', 'document', 'fingerprint', 'head_turn_step', 'capture_resolution', 'device_info', 'liveness_telemetry'],
                 'response' => ['message'],
             ],
             'verifications.submit' => [
@@ -56,6 +56,11 @@ class ApiContractMap
                 'method' => 'GET', 'path' => '/verifications/{verification}/document', 'operationId' => 'getVerificationDocument',
                 'request' => [],
                 'response' => ['document', 'media', 'meta'],
+            ],
+            'verifications.downloadMedia' => [
+                'method' => 'GET', 'path' => '/verifications/{verification}/media/{media}', 'operationId' => 'downloadVerificationMedia',
+                'request' => [],
+                'response' => [],
             ],
             'verifications.estimation' => [
                 'method' => 'GET', 'path' => '/verifications/{verification}/estimation', 'operationId' => 'getVerificationEstimation',
