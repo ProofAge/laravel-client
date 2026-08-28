@@ -542,7 +542,7 @@
         "/verifications/{verification}/document": {
             "get": {
                 "operationId": "getVerificationDocument",
-                "description": "Retrieves sanitized document fields and the source media from the most relevant attempt.\nMedia URLs are signed and expire after the configured document result media TTL.",
+                "description": "Retrieves sanitized document fields and the source media from the most relevant attempt.\nEach media item carries a `url` for the download endpoint, or null when the\nmedia has been purged or has passed its retention window.",
                 "summary": "Get verification document result",
                 "tags": [
                     "Verification"
@@ -580,22 +580,16 @@
                                                 {
                                                     "id": "019de7a0-c11b-7373-9289-b0aa1ba08d13",
                                                     "type": "selfie",
-                                                    "url": "https://api.proofage.xyz/v1/verifications/019de7a0-c11b-7373-9289-b0aa1ba08d13/media/019de7a0-c11b-7373-9289-b0aa1ba08d13",
-                                                    "signed_url": "https://example.com/selfie.jpg?signature=...",
-                                                    "expires_at": "2026-03-19T13:00:00+00:00"
+                                                    "url": "https://api.proofage.xyz/v1/verifications/019de7a0-c11b-7373-9289-b0aa1ba08d13/media/019de7a0-c11b-7373-9289-b0aa1ba08d13"
                                                 },
                                                 {
                                                     "id": "019de7a0-c129-7259-8a08-bc10390ecbdb",
                                                     "type": "document_front",
-                                                    "url": "https://api.proofage.xyz/v1/verifications/019de7a0-c11b-7373-9289-b0aa1ba08d13/media/019de7a0-c129-7259-8a08-bc10390ecbdb",
-                                                    "signed_url": "https://example.com/document-front.jpg?signature=...",
-                                                    "expires_at": "2026-03-19T13:00:00+00:00"
+                                                    "url": "https://api.proofage.xyz/v1/verifications/019de7a0-c11b-7373-9289-b0aa1ba08d13/media/019de7a0-c129-7259-8a08-bc10390ecbdb"
                                                 }
                                             ],
                                             "meta": {
-                                                "attempt_id": "019de7a2-0305-7269-9cff-1715c71b19ae",
-                                                "signed_url_ttl_seconds": 3600,
-                                                "signed_url_expires_at": "2026-03-19T13:00:00+00:00"
+                                                "attempt_id": "019de7a2-0305-7269-9cff-1715c71b19ae"
                                             }
                                         }
                                     ],
@@ -659,23 +653,12 @@
                                                             "string",
                                                             "null"
                                                         ]
-                                                    },
-                                                    "signed_url": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "expires_at": {
-                                                        "type": "string"
                                                     }
                                                 },
                                                 "required": [
                                                     "id",
                                                     "type",
-                                                    "url",
-                                                    "signed_url",
-                                                    "expires_at"
+                                                    "url"
                                                 ]
                                             }
                                         },
@@ -687,18 +670,10 @@
                                                         "string",
                                                         "null"
                                                     ]
-                                                },
-                                                "signed_url_ttl_seconds": {
-                                                    "type": "integer"
-                                                },
-                                                "signed_url_expires_at": {
-                                                    "type": "string"
                                                 }
                                             },
                                             "required": [
-                                                "attempt_id",
-                                                "signed_url_ttl_seconds",
-                                                "signed_url_expires_at"
+                                                "attempt_id"
                                             ]
                                         }
                                     },
@@ -1181,20 +1156,12 @@
                                 },
                                 "url": {
                                     "type": "string"
-                                },
-                                "signed_url": {
-                                    "type": "string"
-                                },
-                                "expires_at": {
-                                    "type": "string"
                                 }
                             },
                             "required": [
                                 "id",
                                 "type",
-                                "url",
-                                "signed_url",
-                                "expires_at"
+                                "url"
                             ]
                         }
                     },
@@ -1203,18 +1170,10 @@
                         "properties": {
                             "attempt_id": {
                                 "type": "string"
-                            },
-                            "signed_url_ttl_seconds": {
-                                "type": "string"
-                            },
-                            "signed_url_expires_at": {
-                                "type": "string"
                             }
                         },
                         "required": [
-                            "attempt_id",
-                            "signed_url_ttl_seconds",
-                            "signed_url_expires_at"
+                            "attempt_id"
                         ]
                     }
                 },

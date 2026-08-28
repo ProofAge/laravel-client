@@ -185,15 +185,14 @@ class VerificationResource
     /**
      * Get sanitized document fields and source media for verification.
      *
-     * Media are ordered selfie, document_front, document_back. Prefer `url`, which
-     * streams the bytes from the ProofAge API via downloadMedia(); `signed_url` is a
-     * presigned Google Cloud Storage URL that expires at `meta.signed_url_expires_at`
-     * and is unreachable from networks Google geoblocks.
+     * Media are ordered selfie, document_front, document_back. Fetch the bytes with
+     * downloadMedia() using `media[].id`; `url` is that endpoint's address and is
+     * null when the media has been purged or has passed its retention window.
      *
      * @return array{
      *     document: array{fields: array{first_name: string|null, last_name: string|null, date_of_birth: string|null, document_number: string|null}},
-     *     media: list<array{id: string, type: string, url: string|null, signed_url: string|null, expires_at: string}>,
-     *     meta: array{attempt_id: string|null, signed_url_ttl_seconds: int, signed_url_expires_at: string}
+     *     media: list<array{id: string, type: string, url: string|null}>,
+     *     meta: array{attempt_id: string|null}
      * }|null
      */
     public function document(): ?array
