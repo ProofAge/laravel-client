@@ -4,6 +4,7 @@ namespace ProofAge\Laravel\Resources;
 
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
+use ProofAge\Laravel\Enums\BlockFaceReasonCode;
 use ProofAge\Laravel\ProofAgeClient;
 use Psr\Http\Message\StreamInterface;
 
@@ -295,7 +296,12 @@ class VerificationResource
      *
      * The API responds 204 No Content, so this returns null.
      *
-     * @param  array{reason?: string}|null  $data
+     * `reason_code` classifies the block and is what blocklist reporting counts;
+     * pass a {@see BlockFaceReasonCode} value whenever a
+     * person made the decision. `reason` is free-text detail, truncated to 1000
+     * characters rather than rejected.
+     *
+     * @param  array{reason?: string, reason_code?: string}|null  $data
      * @return null
      */
     public function blockFace(?array $data = null): ?array

@@ -61,12 +61,13 @@ Request: none.
 Response: `{ verification_id: string, attempt_id: string|null, age_threshold: { minimum: int|null, passed: bool|null, confidence: float|null }, gender: { value: 0|1|null, confidence: float|null }|null }` (gender value: 0=female, 1=male).
 
 ### POST /verifications/{verification}/blocked-face — `ProofAge::verifications($id)->blockFace($data)`
-Request: `{ reason?: string(<=1000) }`.
+Request: `{ reason_code?: string, reason?: string(<=1000) }`.
 Response: `204 No Content` (method returns `null`).
 
 ## Enums
 
 - `status`: one of `created`, `started`, `submitted`, `resubmission_requested`, `approved`, `declined`, `abandoned`, `expired`, `review` (the `ProofAge\Laravel\Enums\VerificationStatus` cases), or `documents_required` — surfaced from the latest attempt's state (an `AttemptStatus`), not a `VerificationStatus` case. Map the `status` field with `VerificationStatus::tryFrom()` and handle `documents_required` explicitly.
+- `reason_code` (request field on `blockFace`): one of `presentation_attack` (spoof: screen, print or mask), `fraudulent_document` (forged, edited, or not a real document), `scam_or_abuse` (identity may be genuine — blocked for behaviour on your platform), `underage`, `other` (explain in `reason`) — the `ProofAge\Laravel\Enums\BlockFaceReasonCode` cases. Optional over the API, mandatory in the ProofAge consoles: send it whenever a person made the decision, or the block cannot be told apart from an automated one in reporting.
 - `reason` (on `declined` / `resubmission_requested`): dotted codes from the server's reason catalog — illustrative examples: `aml.blocklist.face_match`, `document.face.mismatch`, `verification.age_threshold.failed`. `ProofAge\Laravel\Enums\WebhookReason` models only the AML blocklist codes; treat `reason` as an open string.
 
 ## Outbound webhook (ProofAge → your `callback_url` / workspace webhook URL)

@@ -69,7 +69,7 @@ class ApiContractMap
             ],
             'verifications.blockFace' => [
                 'method' => 'POST', 'path' => '/verifications/{verification}/blocked-face', 'operationId' => 'blockVerificationFace',
-                'request' => ['reason'],
+                'request' => ['reason', 'reason_code'],
                 'response' => [],
             ],
         ];
