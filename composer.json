@@ -60,7 +60,6 @@
     },
     "scripts": {
         "test": "phpunit",
-        "sync-spec": "@php scripts/sync-spec.php",
         "check-release": "@php scripts/check-release.php"
     },
     "config": {

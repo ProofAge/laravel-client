@@ -1,4 +1,5 @@
-# Keep src/, config/, resources/, README.md, AGENTS.md, INSTALLATION.md, LICENSE.md in the dist.
+# Keep src/, config/, README.md, AGENTS.md, INSTALLATION.md, UPGRADE.md, CHANGELOG.md, LICENSE.md in the dist.
+# The API spec and the contract tests live in proofage/php-sdk (vendor/proofage/php-sdk/resources/).
 /.github            export-ignore
 /.cursor            export-ignore
 /.idea              export-ignore

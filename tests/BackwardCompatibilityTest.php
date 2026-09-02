@@ -16,6 +16,9 @@ use ProofAge\Laravel\Resources\VerificationResource;
 use ProofAge\Laravel\Resources\WorkspaceResource;
 use ProofAge\Laravel\Services\WebhookSignatureVerifier;
 use ProofAge\Sdk\Client as SdkClient;
+use ProofAge\Sdk\Enums\BlockFaceReasonCode;
+use ProofAge\Sdk\Enums\VerificationStatus;
+use ProofAge\Sdk\Enums\WebhookReason;
 use ProofAge\Sdk\Exceptions\AuthenticationException as SdkAuthenticationException;
 use ProofAge\Sdk\Exceptions\ExceptionInterface;
 use ProofAge\Sdk\Exceptions\ProofAgeException as SdkProofAgeException;
@@ -226,6 +229,21 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertInstanceOf(WebhookVerificationException::class, $thrown);
         $this->assertSame('MISSING_SIGNATURE', $thrown->errorCode);
         $this->assertSame(401, $thrown->statusCode);
+    }
+
+    public function test_the_laravel_enums_are_gone_and_the_sdk_enums_replace_them(): void
+    {
+        // The one edit a consumer must make: import ProofAge\Sdk\Enums\* instead. Deliberate
+        // (an enum cannot be subclassed, so a twin would drift) and therefore tested.
+        foreach (['VerificationStatus', 'WebhookReason', 'BlockFaceReasonCode'] as $enum) {
+            $this->assertFalse(enum_exists("ProofAge\\Laravel\\Enums\\{$enum}"), "ProofAge\\Laravel\\Enums\\{$enum} must not exist.");
+            $this->assertFalse(class_exists("ProofAge\\Laravel\\Enums\\{$enum}"));
+            $this->assertTrue(enum_exists("ProofAge\\Sdk\\Enums\\{$enum}"), "ProofAge\\Sdk\\Enums\\{$enum} is the replacement.");
+        }
+
+        $this->assertSame('approved', VerificationStatus::APPROVED->value);
+        $this->assertSame('underage', BlockFaceReasonCode::UNDERAGE->value);
+        $this->assertTrue(WebhookReason::isAmlBlocklist('aml.blocklist.face_match'));
     }
 
     public function test_the_retained_laravel_exception_classes_are_marked_deprecated(): void
