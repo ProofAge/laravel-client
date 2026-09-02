@@ -3,24 +3,29 @@
 namespace ProofAge\Laravel\Tests;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use ProofAge\Laravel\Exceptions\AuthenticationException;
 use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\Exceptions\ValidationException;
 use ProofAge\Laravel\Exceptions\WebhookVerificationException;
 use ProofAge\Laravel\Facades\ProofAge;
+use ProofAge\Laravel\Middleware\VerifyWebhookSignature;
 use ProofAge\Laravel\ProofAgeClient;
 use ProofAge\Laravel\Resources\VerificationResource;
 use ProofAge\Laravel\Resources\WorkspaceResource;
+use ProofAge\Laravel\Services\WebhookSignatureVerifier;
 use ProofAge\Sdk\Client as SdkClient;
 use ProofAge\Sdk\Exceptions\AuthenticationException as SdkAuthenticationException;
 use ProofAge\Sdk\Exceptions\ExceptionInterface;
 use ProofAge\Sdk\Exceptions\ProofAgeException as SdkProofAgeException;
 use ProofAge\Sdk\Exceptions\TransportException;
 use ProofAge\Sdk\Exceptions\ValidationException as SdkValidationException;
+use ProofAge\Sdk\Exceptions\WebhookVerificationException as SdkWebhookVerificationException;
 use ProofAge\Sdk\Http\Response as SdkResponse;
 use ProofAge\Sdk\Resources\VerificationResource as SdkVerificationResource;
 use ProofAge\Sdk\Resources\WorkspaceResource as SdkWorkspaceResource;
+use ProofAge\Sdk\Webhooks\WebhookSignatureVerifier as SdkWebhookSignatureVerifier;
 
 /*
  * Every pre-0.7 name that survives is a real class the SDK's counterpart sits above.
@@ -177,6 +182,50 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertSame('abc', $response->header('X-Trace'));
         $this->assertTrue($response->ok());
         $this->assertSame('bytes', (string) $streamed->getBody());
+    }
+
+    public function test_the_webhook_signature_verifier_is_the_sdk_verifier(): void
+    {
+        $verifier = new WebhookSignatureVerifier('secret', 300);
+
+        $this->assertInstanceOf(SdkWebhookSignatureVerifier::class, $verifier);
+
+        $timestamp = time();
+        $signature = $verifier->generateSignature('{"status":"approved"}', $timestamp);
+
+        $this->assertTrue($verifier->verify('{"status":"approved"}', $timestamp, $signature));
+        $this->assertFalse($verifier->verify('{"status":"declined"}', $timestamp, $signature));
+    }
+
+    public function test_the_webhook_verification_exception_is_the_sdk_exception_and_renders_its_own_body(): void
+    {
+        $exception = new WebhookVerificationException('INVALID_SIGNATURE', 'HMAC signature is invalid');
+
+        $this->assertInstanceOf(SdkWebhookVerificationException::class, $exception);
+        $this->assertInstanceOf(SdkProofAgeException::class, $exception);
+
+        $rendered = $exception->render(request());
+
+        $this->assertSame(401, $rendered->getStatusCode());
+        $this->assertSame($exception->toArray(), $rendered->getData(true));
+        $this->assertSame(['error' => ['code' => 'INVALID_SIGNATURE', 'message' => 'HMAC signature is invalid']], $rendered->getData(true));
+    }
+
+    public function test_the_middleware_reports_a_missing_header_before_missing_configuration(): void
+    {
+        // The pre-0.7 order: an unsigned request is rejected as unsigned even on a
+        // misconfigured app. Delegating the checks to the SDK must not reorder them.
+        config(['proofage.secret_key' => null]);
+
+        $request = Request::create('/webhook', 'POST', [], [], [], [], '{}');
+        $request->headers->set('X-Timestamp', (string) time());
+        $request->headers->set('X-Auth-Client', 'test-api-key');
+
+        $thrown = $this->thrownBy(fn () => (new VerifyWebhookSignature)->handle($request, fn () => response('ok')));
+
+        $this->assertInstanceOf(WebhookVerificationException::class, $thrown);
+        $this->assertSame('MISSING_SIGNATURE', $thrown->errorCode);
+        $this->assertSame(401, $thrown->statusCode);
     }
 
     public function test_the_retained_laravel_exception_classes_are_marked_deprecated(): void
