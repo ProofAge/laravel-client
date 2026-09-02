@@ -2,20 +2,9 @@
 
 namespace ProofAge\Laravel\Exceptions;
 
-class ValidationException extends ProofAgeException
-{
-    protected array $errors = [];
-
-    public function getErrors(): array
-    {
-        if (empty($this->errors) && $this->response) {
-            $data = $this->response->json();
-
-            if (isset($data['errors'])) {
-                $this->errors = $data['errors'];
-            }
-        }
-
-        return $this->errors;
-    }
-}
+/**
+ * HTTP 422 under its pre-0.7 name; what the client throws in a Laravel app. getErrors() is inherited.
+ *
+ * @deprecated since 0.7.0, removed in 1.0. Catch ProofAge\Sdk\Exceptions\ValidationException instead.
+ */
+class ValidationException extends \ProofAge\Sdk\Exceptions\ValidationException {}

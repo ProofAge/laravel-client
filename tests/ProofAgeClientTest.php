@@ -8,6 +8,7 @@ use ProofAge\Laravel\Exceptions\AuthenticationException;
 use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\Exceptions\ValidationException;
 use ProofAge\Laravel\ProofAgeClient;
+use ProofAge\Sdk\Testing\FakeHttpClient;
 
 class ProofAgeClientTest extends TestCase
 {
@@ -114,23 +115,25 @@ class ProofAgeClientTest extends TestCase
 
     public function test_it_generates_correct_hmac_signature_for_json_data(): void
     {
-        $method = 'POST';
-        $endpoint = 'verifications';
+        // Signing now lives in the SDK; what this package must guarantee is that the
+        // signature the SDK computed is what leaves through the Http facade, over the
+        // exact bytes sent — here a body whose slashes json_encode() escapes.
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications' => Http::response(['id' => 'ver_123']),
+        ]);
         $data = ['callback_url' => 'https://example.com/webhook'];
         $rawBody = json_encode($data);
 
-        $reflection = new \ReflectionClass($this->client);
-        $methodReflection = $reflection->getMethod('generateHmacSignature');
-        $methodReflection->setAccessible(true);
-
-        $signature = $methodReflection->invoke($this->client, $method, $endpoint, $rawBody);
+        $client->verifications()->create($data);
 
         $expectedCanonical = 'POST/v1/verifications'.$rawBody;
         $expectedSignature = hash_hmac('sha256', $expectedCanonical, 'test-secret-key');
 
-        $this->assertIsString($signature);
-        $this->assertEquals(64, strlen($signature));
-        $this->assertEquals($expectedSignature, $signature);
+        Http::assertSent(function ($request) use ($rawBody, $expectedSignature) {
+            return $request->body() === $rawBody
+                && strlen($request->header('X-HMAC-Signature')[0]) === 64
+                && $request->header('X-HMAC-Signature') === [$expectedSignature];
+        });
     }
 
     public function test_it_can_accept_consent_for_verification(): void
@@ -160,24 +163,23 @@ class ProofAgeClientTest extends TestCase
 
     public function test_from_response_returns_correct_subclass_for_authentication(): void
     {
-        $response = Http::fake([
-            '*' => Http::response(['error' => ['message' => 'Unauthorized']], 401),
-        ])->get('https://example.com');
+        $response = FakeHttpClient::json(['error' => ['message' => 'Unauthorized']], 401);
 
         $exception = AuthenticationException::fromResponse($response);
 
         $this->assertInstanceOf(AuthenticationException::class, $exception);
+        $this->assertSame('Unauthorized', $exception->getMessage());
+        $this->assertSame(401, $exception->getCode());
     }
 
     public function test_from_response_returns_correct_subclass_for_validation(): void
     {
-        $response = Http::fake([
-            '*' => Http::response(['error' => ['message' => 'Validation failed'], 'errors' => ['field' => ['required']]], 422),
-        ])->get('https://example.com');
+        $response = FakeHttpClient::json(['error' => ['message' => 'Validation failed'], 'errors' => ['field' => ['required']]], 422);
 
         $exception = ValidationException::fromResponse($response);
 
         $this->assertInstanceOf(ValidationException::class, $exception);
+        $this->assertSame(['field' => ['required']], $exception->getErrors());
     }
 
     public function test_it_sends_file_upload_as_multipart(): void
