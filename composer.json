@@ -12,18 +12,6 @@
     "support": {
         "docs": "https://docs.proofage.xyz/api-reference.html#/"
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../proofage-php-sdk",
-            "options": {
-                "symlink": true,
-                "versions": {
-                    "proofage/php-sdk": "0.1.0"
-                }
-            }
-        }
-    ],
     "require": {
         "php": "^8.2",
         "proofage/php-sdk": "^0.1",

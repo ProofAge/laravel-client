@@ -10,11 +10,11 @@
  * on a number Packagist already served from a different commit — which would
  * have changed the contents of a published release. Ask the registry instead.
  *
- * Dependency gate: this package requires proofage/php-sdk. A local checkout
- * resolves it from the sibling directory through the path repository in
- * composer.json; Packagist has no such fallback. A laravel-client tag that goes
- * out before a matching proofage/php-sdk release is on Packagist gives every
- * consumer an unresolvable dependency, so a candidate is refused until one is.
+ * Dependency gate: this package requires proofage/php-sdk, which consumers
+ * resolve from Packagist. A laravel-client tag that goes out ahead of the SDK
+ * release its constraint needs (a bumped ^ constraint, or a first release) gives
+ * every consumer an unresolvable dependency, so a candidate is refused until
+ * Packagist serves an SDK version satisfying the constraint in composer.json.
  *
  * Usage:
  *   php scripts/check-release.php            # show what is published
@@ -96,8 +96,7 @@ if ($constraint !== null) {
         $verdict = $candidate === null ? 'WARNING' : 'REFUSED';
 
         fwrite(STDERR, "{$verdict}: {$package} requires {$sdk} {$constraint}, but Packagist serves {$serves} for it.\n");
-        fwrite(STDERR, "A local checkout resolves the SDK from ../proofage-php-sdk (the path repository in composer.json); consumers cannot.\n");
-        fwrite(STDERR, "Publish {$sdk} first, then tag this package.\n");
+        fwrite(STDERR, "No consumer could install this release. Publish {$sdk} first, then tag this package.\n");
 
         if ($candidate !== null) {
             exit(1);

@@ -6,10 +6,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use ProofAge\Laravel\Exceptions\AuthenticationException;
-use ProofAge\Laravel\Exceptions\ProofAgeException;
-use ProofAge\Laravel\Exceptions\ValidationException;
 use ProofAge\Laravel\Facades\ProofAge;
+// The client throws this package's ProofAge\Laravel\Exceptions\* classes, which extend these SDK
+// classes, so catching the SDK names works — and the SDK base class is the one that catches
+// every error, 401 and 422 included (see UPGRADE.md).
+use ProofAge\Sdk\Exceptions\AuthenticationException;
+use ProofAge\Sdk\Exceptions\ProofAgeException;
+use ProofAge\Sdk\Exceptions\ValidationException;
 
 class VerificationController extends Controller
 {

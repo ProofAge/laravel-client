@@ -1,14 +1,24 @@
 <?php
 
+/*
+ * Using the client outside a Laravel application.
+ *
+ * ProofAge\Laravel\ProofAgeClient sends through Laravel's Http facade, which needs a booted
+ * application. Outside one, use the framework-neutral SDK this package is built on: same
+ * resource methods, same config keys, no framework dependencies. Inside Laravel, prefer the
+ * facade or app(ProofAgeClient::class) — see laravel-usage.php.
+ */
+
 require_once __DIR__.'/../vendor/autoload.php';
 
-use ProofAge\Laravel\Exceptions\AuthenticationException;
-use ProofAge\Laravel\Exceptions\ProofAgeException;
-use ProofAge\Laravel\Exceptions\ValidationException;
-use ProofAge\Laravel\ProofAgeClient;
+use ProofAge\Sdk\Client;
+use ProofAge\Sdk\Exceptions\AuthenticationException;
+use ProofAge\Sdk\Exceptions\ProofAgeException;
+use ProofAge\Sdk\Exceptions\TransportException;
+use ProofAge\Sdk\Exceptions\ValidationException;
 
 // Initialize the client
-$client = new ProofAgeClient([
+$client = new Client([
     'api_key' => 'your-api-key',
     'secret_key' => 'your-secret-key',
     'base_url' => 'https://api.proofage.xyz',
@@ -47,14 +57,14 @@ try {
     ]);
     echo 'Consent accepted at: '.$consentResult['consent_accepted_at']."\n\n";
 
-    // Upload a selfie (example with file path)
+    // Upload a selfie (example with file path; a path that does not exist throws \InvalidArgumentException)
     if (file_exists('/path/to/selfie.jpg')) {
         echo "Uploading selfie...\n";
         $mediaResult = $client->verifications($verificationId)->uploadMedia([
             'type' => 'selfie',
             'file' => '/path/to/selfie.jpg',
         ]);
-        echo 'Media uploaded: '.$mediaResult['id']."\n\n";
+        echo 'Media uploaded: '.$mediaResult['message']."\n\n";
     }
 
     // Get verification status
@@ -73,6 +83,8 @@ try {
 } catch (ValidationException $e) {
     echo 'Validation error: '.$e->getMessage()."\n";
     echo 'Validation errors: '.json_encode($e->getErrors())."\n";
+} catch (TransportException $e) {
+    echo 'Could not reach the API: '.$e->getMessage()."\n";
 } catch (ProofAgeException $e) {
     echo 'ProofAge API error: '.$e->getMessage()."\n";
     if ($e->getResponse()) {

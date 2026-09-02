@@ -1,100 +1,59 @@
-# ProofAge Laravel Client — API contract for agents
+# ProofAge Laravel Client — contract for agents
 
-This package wraps the ProofAge v1 HTTP API. Methods on `ProofAge::workspace()` and
-`ProofAge::verifications($id)` return decoded JSON as `array|null`. The exact request and
-response shape of every method is below and in the `@param`/`@return` PHPDoc on
-`src/Resources/`. A machine-readable spec ships at `resources/openapi.json` (authoritative
-for endpoints + request bodies; response schemas there are incomplete by generator
-limitation — the shapes below are authoritative for responses).
+This package is the Laravel integration layer over `proofage/php-sdk`. **The API contract lives in
+the SDK**: every endpoint with its request and response shape, the HMAC canonical forms, the enums,
+and the outbound webhook body are in `vendor/proofage/php-sdk/AGENTS.md`, with the machine-readable
+spec at `vendor/proofage/php-sdk/resources/openapi.json` and the `@param`/`@return` PHPDoc on
+`ProofAge\Sdk\Resources\*`. Nothing about that contract is duplicated here.
 
-All requests send `X-API-Key` and `X-HMAC-Signature`. Base URL is
-`{base_url}/{version}` (defaults `https://api.proofage.xyz/v1`).
+Methods on `ProofAge::workspace()` and `ProofAge::verifications($id)` return decoded JSON as
+`array|null`; they are the SDK resources under this package's names.
 
-## Auth / HMAC
+## What this package adds
 
-- `X-API-Key`: workspace API key (plaintext; the server SHA256-hashes it).
-- `X-HMAC-Signature`: hex HMAC-SHA256 with the workspace secret key over a canonical string:
-  - JSON / no-file requests: `METHOD + /{version}/{path} + rawJsonBody`.
-  - Multipart (file) requests: `METHOD/{version}/{path}\n{sorted fields as RFC3986 query}\n{comma-joined sorted sha256(file) hashes}`.
-
-## Endpoints
-
-### GET /workspace — `ProofAge::workspace()->get()`
-Request: none.
-Response: `{ id: string, name: string, flow_type: string, mode: string, age_mode: string|null, age_threshold: int|null, verification_type: string, redirect_url: string|null, webhook_url: string|null, allow_expired_documents: bool, allow_duplicate_accounts: bool }`
-
-### GET /consent — `ProofAge::workspace()->getConsent()`
-Request: none.
-Response: `{ id: int, version: string, text_sha256: string, url: string }`
-
-### POST /verifications — `ProofAge::verifications()->create($data)`
-Request: `{ fingerprint?: string(64), callback_url?: url(<=2048), external_id?: string(<=255), external_metadata?: object, metadata?: object }`
-Response: `{ id: string, external_id: string|null, external_metadata: object|null, redirect_url: string|null, status: string, reason: string|null, consent_accepted_at: string|null, created_at: string, updated_at: string, url: string }`
-Errors: `402` `{ code: "PAYMENT_METHOD_REQUIRED", message, free_verifications_remaining, trial_ends_at, trial_active }`.
-
-### GET /verifications/{verification} — `ProofAge::verifications($id)->find($id)` / `->get()`
-Request: none.
-Response: same as create **without** `url`.
-
-### POST /verifications/{verification}/consent — `ProofAge::verifications($id)->acceptConsent($data)`
-Request: `{ consent_version_id: int, text_sha256: string(64 hex) }`
-Response: `{ consent_version_id: int, consent_accepted_at: string }`
-
-### POST /verifications/{verification}/media — `ProofAge::verifications($id)->uploadMedia($data)` (multipart)
-Request: `{ file: UploadedFile|path, type: "selfie"|"liveness_selfie"|"document", side?: "front"|"back" (req. if type=document), document?: "id"|"driver_license"|"passport"|"residence_permit" (req. if type=document), fingerprint?: string(64), head_turn_step?: int(0..10), capture_resolution?: json-string, device_info?: json-string }`
-Response: `{ message: string }`. Requires consent accepted first.
-
-### POST /verifications/{verification}/submit — `ProofAge::verifications($id)->submit()`
-Request: none.
-Response: `{ message: string }`. Error: `422 { error: { code, message } }`.
-
-### GET /verifications/{verification}/document — `ProofAge::verifications($id)->document()`
-Request: none.
-Response: `{ document: { fields: { first_name: string|null, last_name: string|null, date_of_birth: string|null (YYYY-MM-DD), document_number: string|null } }, media: [ { id: string, type: "selfie"|"document_front"|"document_back", url: string|null } ], meta: { attempt_id: string|null } }`. `url` is the download endpoint for that media, null when it has been purged or is past retention; fetch the bytes with `downloadMedia(media[].id)`.
-
-### GET /verifications/{verification}/media/{media} — `ProofAge::verifications($id)->downloadMedia($mediaId)`
-Request: none. `{media}` is `media[].id` from document().
-Response: the image bytes, `Content-Type` from the file (e.g. `image/jpeg`). `downloadMedia()` returns a PSR-7 `StreamInterface`; `downloadMediaTo($mediaId, $path)` streams to disk and returns the path. Downloads do not retry HTTP failures — 429 included — because they run from a queue whose backoff owns the wait; raise `PROOFAGE_DOWNLOAD_RETRY_ATTEMPTS` (default 1) to retry connection failures only. Error: `404 { error: { code: "MEDIA_NOT_FOUND", message } }` when the media is purged, past retention, or not part of this verification. `url` is null when the media has been purged or is past retention, so check it before downloading rather than treating a 404 as normal.
-
-### GET /verifications/{verification}/estimation — `ProofAge::verifications($id)->estimation()`
-Request: none.
-Response: `{ verification_id: string, attempt_id: string|null, age_threshold: { minimum: int|null, passed: bool|null, confidence: float|null }, gender: { value: 0|1|null, confidence: float|null }|null }` (gender value: 0=female, 1=male).
-
-### POST /verifications/{verification}/blocked-face — `ProofAge::verifications($id)->blockFace($data)`
-Request: `{ reason_code?: string, reason?: string(<=1000) }`.
-Response: `204 No Content` (method returns `null`).
-
-## Enums
-
-- `status`: one of `created`, `started`, `submitted`, `resubmission_requested`, `approved`, `declined`, `abandoned`, `expired`, `review` (the `ProofAge\Laravel\Enums\VerificationStatus` cases), or `documents_required` — surfaced from the latest attempt's state (an `AttemptStatus`), not a `VerificationStatus` case. Map the `status` field with `VerificationStatus::tryFrom()` and handle `documents_required` explicitly.
-- `reason_code` (request field on `blockFace`): one of `presentation_attack` (spoof: screen, print or mask), `fraudulent_document` (forged, edited, or not a real document), `scam_or_abuse` (identity may be genuine — blocked for behaviour on your platform), `underage`, `other` (explain in `reason`) — the `ProofAge\Laravel\Enums\BlockFaceReasonCode` cases. Optional over the API, mandatory in the ProofAge consoles: send it whenever a person made the decision, or the block cannot be told apart from an automated one in reporting.
-- `reason` (on `declined` / `resubmission_requested`): dotted codes from the server's reason catalog — illustrative examples: `aml.blocklist.face_match`, `document.face.mismatch`, `verification.age_threshold.failed`. `ProofAge\Laravel\Enums\WebhookReason` models only the AML blocklist codes; treat `reason` as an open string.
-
-## Outbound webhook (ProofAge → your `callback_url` / workspace webhook URL)
-
-Headers: `X-Auth-Client` (api key), `X-Timestamp` (unix seconds), `X-HMAC-Signature`
-(= hex HMAC-SHA256 of `{timestamp}.{rawJsonBody}` with the active secret key),
-`X-ProofAge-Webhook-Delivery-Id`. Verify with the `proofage.verify_webhook` middleware.
-
-Body:
-```
-{
-  "verification_id": string,
-  "status": string,
-  "external_id": string|null,
-  "external_metadata": object|null,
-  "reason": string|null,                       // only on resubmission_requested / declined
-  "timestamp": string (ISO8601),
-  "duplicate_detected"?: true,                 // present only when a duplicate was found
-  "duplicate_of"?: { "verification_id": string, "external_id": string|null },
-  "fingerprint_signals"?: { "ip_address"?, "ip_country_code"?, "ip_timezone"?, "device_timezone"?, ... },
-  "manual_moderation"?: { "action": "approve"|"decline", "reason": string, "source": string,
-                          "performed_by": string, "source_status"?: string|null, "source_reason"?: string|null }
-}
-```
+- **Service provider** (auto-discovered): binds `ProofAge\Laravel\ProofAgeClient` as a singleton,
+  also reachable as `app('proofage')` and `app(\ProofAge\Sdk\Client::class)`; publishes
+  `config/proofage.php` (tag `config`); registers the middleware alias and the artisan command.
+- **Facade** `ProofAge\Laravel\Facades\ProofAge`: `workspace(): WorkspaceResource`,
+  `verifications(?string $id = null): VerificationResource` (the `ProofAge\Laravel\Resources\*`
+  subclasses of the SDK resources).
+- **Client** `ProofAge\Laravel\ProofAgeClient extends ProofAge\Sdk\Client`: transport defaults to
+  `ProofAge\Laravel\Http\IlluminateHttpClient` (sends through the `Http` facade, so `Http::fake()`
+  intercepts; no retry or throw of its own) and exceptions default to
+  `ProofAge\Laravel\Exceptions\LaravelExceptionFactory`. `makeRequest()` / `makeStreamedRequest()`
+  return `ProofAge\Sdk\Http\Response`.
+- **Multiple workspaces**: `app(ProofAgeClientFactory::class)->make('services.proofage_seller')`
+  reads `api_key`/`secret_key` under that prefix; `base_url`, `version`, `timeout`,
+  `retry_attempts`, `retry_delay`, `download_retry_attempts`, `webhook_tolerance` fall back to
+  `proofage.*` (`ProofAge\Laravel\Support\ConfigResolver`).
+- **Config keys / env**: `api_key` (`PROOFAGE_API_KEY`), `secret_key` (`PROOFAGE_SECRET_KEY`),
+  `base_url` (`PROOFAGE_BASE_URL`, default `https://api.proofage.xyz`), `version`
+  (`PROOFAGE_VERSION`, `v1`), `timeout` (`PROOFAGE_TIMEOUT`, 30), `retry_attempts`
+  (`PROOFAGE_RETRY_ATTEMPTS`, 3), `retry_delay` (`PROOFAGE_RETRY_DELAY`, 1000 ms),
+  `download_retry_attempts` (`PROOFAGE_DOWNLOAD_RETRY_ATTEMPTS`, 1), `webhook_tolerance`
+  (`PROOFAGE_WEBHOOK_TOLERANCE`, 300 s).
+- **Webhook middleware** alias `proofage.verify_webhook` (or `proofage.verify_webhook:{prefix}`):
+  `ProofAge\Laravel\Middleware\VerifyWebhookSignature`. Reads `X-HMAC-Signature`, `X-Timestamp`,
+  `X-Auth-Client`; throws `ProofAge\Laravel\Exceptions\WebhookVerificationException` with, in this
+  order, `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`, `MISSING_AUTH_CLIENT` (401),
+  `CONFIGURATION_ERROR` (418, keys missing under the prefix), then the SDK
+  `WebhookVerifier` sequence `INVALID_AUTH_CLIENT`, `TIMESTAMP_TOO_OLD`, `INVALID_SIGNATURE` (401).
+  Unhandled, it renders `{ "error": { "code", "message" } }` with that status.
+- **Artisan** `proofage:verify-setup [--config=prefix]`: checks config, calls `GET /workspace`,
+  checks that the workspace's `webhook_url` has a POST route protected by the middleware with the
+  matching prefix. Exit 0 on success (warns when webhooks are not configured), 1 on failure.
+- **Exceptions** thrown by the client: `ProofAge\Laravel\Exceptions\AuthenticationException` (401),
+  `ValidationException` (422, `getErrors()`), `ProofAgeException` (other statuses, configuration).
+  Each extends its `ProofAge\Sdk\Exceptions\*` counterpart, so a `catch` on either name matches;
+  the catch-all is `ProofAge\Sdk\Exceptions\ProofAgeException` (the Laravel base class does not
+  catch the Laravel 401/422 subclasses). Network failures are
+  `ProofAge\Sdk\Exceptions\TransportException`. The four Laravel classes are deprecated names,
+  removed in 1.0.
+- **Enums**: `ProofAge\Sdk\Enums\VerificationStatus`, `WebhookReason`, `BlockFaceReasonCode`.
+  There is no `ProofAge\Laravel\Enums\*` since 0.7.0.
 
 ## Keeping this in sync
 
-This contract is drift-tested against `resources/openapi.json` via `tests/ApiContractTest.php`,
-so it stays aligned with the API. Maintainers refreshing it after an API change: see the SDK
-contract-sync runbook in the ProofAge app repo (the single source of truth for all SDKs).
+Endpoint or shape changes are made in the SDK first (`composer run sync-spec` and
+`tests/ApiContractTest.php` there). This package only follows the SDK version constraint in
+`composer.json`; see `CLAUDE.md` for the release rules.
