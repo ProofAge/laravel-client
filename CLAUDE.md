@@ -6,6 +6,15 @@
 Run `composer run check-release <version>` first — it prints what Packagist serves and refuses a
 number that is already taken or below the published latest.
 
+**It also refuses to release ahead of `proofage/php-sdk`.** This package requires the SDK, and a
+local checkout resolves it from the sibling `../proofage-php-sdk` directory through the path
+repository in `composer.json` (pinned there as `0.1.0`, because Composer reads a branch checkout as
+`dev-main`; bump that pin together with the `^` constraint). Consumers have no such fallback: a tag
+that goes out before a matching SDK release is on Packagist gives every one of them an unresolvable
+dependency. The script checks Packagist for a version satisfying the constraint and exits 1 until
+there is one. Consequence for local work: `composer install` here needs the SDK checked out as a
+sibling, or Composer stops with "The `url` supplied for the path repository does not exist".
+
 This repo's tags genuinely lie: versions 0.2.9 through 0.5.0 are published on Packagist with no
 tag behind them any more (nobody has established who removed them — the org audit log is not
 reachable and GitHub's events feed carries no tag events for this repo). Reading `git tag` in

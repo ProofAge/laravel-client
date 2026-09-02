@@ -12,12 +12,24 @@
     "support": {
         "docs": "https://docs.proofage.xyz/api-reference.html#/"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../proofage-php-sdk",
+            "options": {
+                "symlink": true,
+                "versions": {
+                    "proofage/php-sdk": "0.1.0"
+                }
+            }
+        }
+    ],
     "require": {
         "php": "^8.2",
+        "proofage/php-sdk": "^0.1",
         "illuminate/http": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
-        "illuminate/config": "^12.0|^13.0",
-        "psr/http-message": "^1.0|^2.0"
+        "illuminate/config": "^12.0|^13.0"
     },
     "require-dev": {
         "orchestra/testbench": "^10.0|^11.0",

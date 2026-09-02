@@ -2,7 +2,7 @@
 
 /**
  * Prints the versions Packagist actually serves, and refuses a version that is
- * already taken.
+ * already taken — or one that would ship with a dependency nobody can install.
  *
  * The git tags in this repository are NOT a reliable picture of what has been
  * released: several published versions (0.2.9 through 0.5.0) have no tag behind
@@ -10,28 +10,112 @@
  * on a number Packagist already served from a different commit — which would
  * have changed the contents of a published release. Ask the registry instead.
  *
+ * Dependency gate: this package requires proofage/php-sdk. A local checkout
+ * resolves it from the sibling directory through the path repository in
+ * composer.json; Packagist has no such fallback. A laravel-client tag that goes
+ * out before a matching proofage/php-sdk release is on Packagist gives every
+ * consumer an unresolvable dependency, so a candidate is refused until one is.
+ *
  * Usage:
  *   php scripts/check-release.php            # show what is published
  *   php scripts/check-release.php v0.7.0     # also verify that version is free
  */
-$package = json_decode((string) file_get_contents(__DIR__.'/../composer.json'), true)['name'];
-$url = "https://repo.packagist.org/p2/{$package}.json";
+$composer = json_decode((string) file_get_contents(__DIR__.'/../composer.json'), true);
+$package = $composer['name'];
 
-$body = @file_get_contents($url);
+/**
+ * Versions Packagist serves for a package, oldest first: version => short source reference.
+ * An empty array means Packagist has never heard of the package. Exits when it is unreachable.
+ *
+ * @return array<string, string>
+ */
+function packagistReleases(string $package): array
+{
+    $url = "https://repo.packagist.org/p2/{$package}.json";
+    $body = @file_get_contents($url);
 
-if ($body === false) {
-    fwrite(STDERR, "Could not reach Packagist ({$url}). Check the published versions by hand before tagging.\n");
+    if ($body === false) {
+        $status = isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m) ? (int) $m[1] : 0;
+
+        if ($status === 404) {
+            return [];
+        }
+
+        fwrite(STDERR, "Could not reach Packagist ({$url}). Check the published versions by hand before tagging.\n");
+        exit(2);
+    }
+
+    $payload = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+    $released = [];
+
+    foreach (reset($payload['packages']) ?: [] as $release) {
+        $released[ltrim((string) $release['version'], 'v')] = substr((string) $release['source']['reference'], 0, 8);
+    }
+
+    uksort($released, 'version_compare');
+
+    return $released;
+}
+
+/**
+ * Whether a version satisfies a plain caret constraint (^0.1, ^1.2.3), the only form this
+ * package uses for the SDK. Any other form is left to Composer and treated as satisfied.
+ */
+function satisfiesCaret(string $version, string $constraint): bool
+{
+    if (! preg_match('/^\^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/', $constraint, $m)) {
+        return true;
+    }
+
+    [$major, $minor, $patch] = [(int) $m[1], (int) ($m[2] ?? 0), (int) ($m[3] ?? 0)];
+    $lower = "{$major}.{$minor}.{$patch}";
+
+    // Caret allows changes up to the next major; below 1.0 up to the next minor; below 0.1 the next patch.
+    if ($major > 0 || ! isset($m[2])) {
+        $upper = ($major + 1).'.0.0';
+    } elseif ($minor > 0 || ! isset($m[3])) {
+        $upper = '0.'.($minor + 1).'.0';
+    } else {
+        $upper = '0.0.'.($patch + 1);
+    }
+
+    return version_compare($version, $lower, '>=') && version_compare($version, $upper, '<');
+}
+
+$candidate = $argv[1] ?? null;
+
+$sdk = 'proofage/php-sdk';
+$constraint = $composer['require'][$sdk] ?? null;
+
+if ($constraint !== null) {
+    $sdkReleases = packagistReleases($sdk);
+    $usable = array_filter(array_keys($sdkReleases), fn (string $version) => satisfiesCaret($version, $constraint));
+
+    if ($usable === []) {
+        $serves = $sdkReleases === [] ? 'nothing' : implode(', ', array_keys($sdkReleases));
+        $verdict = $candidate === null ? 'WARNING' : 'REFUSED';
+
+        fwrite(STDERR, "{$verdict}: {$package} requires {$sdk} {$constraint}, but Packagist serves {$serves} for it.\n");
+        fwrite(STDERR, "A local checkout resolves the SDK from ../proofage-php-sdk (the path repository in composer.json); consumers cannot.\n");
+        fwrite(STDERR, "Publish {$sdk} first, then tag this package.\n");
+
+        if ($candidate !== null) {
+            exit(1);
+        }
+
+        fwrite(STDERR, "\n");
+    } else {
+        echo "{$sdk} {$constraint} resolves from Packagist (".implode(', ', $usable).").\n\n";
+    }
+}
+
+$released = packagistReleases($package);
+
+if ($released === []) {
+    fwrite(STDERR, "Packagist serves no versions of {$package}.\n");
     exit(2);
 }
 
-$payload = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
-$released = [];
-
-foreach (reset($payload['packages']) as $release) {
-    $released[ltrim((string) $release['version'], 'v')] = substr((string) $release['source']['reference'], 0, 8);
-}
-
-uksort($released, 'version_compare');
 $latest = array_key_last($released);
 
 echo "Published on Packagist ({$package}):\n";
@@ -44,8 +128,6 @@ foreach (array_slice($released, -5, 5, true) as $version => $reference) {
 
 echo "\nLatest published: {$latest}\n";
 echo "Next patch: {$major}.{$minor}.".($patch + 1)."  |  next minor: {$major}.".($minor + 1).".0\n";
-
-$candidate = $argv[1] ?? null;
 
 if ($candidate === null) {
     exit(0);
