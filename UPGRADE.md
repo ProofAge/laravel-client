@@ -154,7 +154,9 @@ for a specific status until 1.0.
 - `downloadMediaTo()` writes to a temporary sibling file and renames it into place after a 2xx. A
   404 or a network failure leaves nothing at the destination and a file already there untouched;
   0.6 left the JSON error body under the media's name.
-- Retries, delays and both retry policies (interactive and download) are unchanged.
+- Retries, delays and both retry policies (interactive and download) are unchanged. The wait
+  between attempts now goes through `Illuminate\Support\Sleep`, so `Sleep::fake()` in a test
+  records it (`Sleep::assertSleptTimes(2)`) instead of the test sleeping for real.
 
 ### New in 0.7
 

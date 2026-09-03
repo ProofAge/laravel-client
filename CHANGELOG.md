@@ -17,6 +17,9 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
   exception classes, so every pre-0.7 `catch` keeps matching, and so does a `catch` on the SDK
   base `ProofAge\Sdk\Exceptions\ProofAgeException`.
 - `app(\ProofAge\Sdk\Client::class)` resolves the same singleton as `app(ProofAgeClient::class)`.
+- The wait between retry attempts goes through `Illuminate\Support\Sleep::usleep()`, so
+  `Sleep::fake()` covers it in your tests; `ProofAgeClient::__construct()` takes the sleeper as its
+  fourth argument, as the SDK's `Client` does.
 - Everything the SDK client offers is available on `ProofAgeClient`: `pushMiddleware()`,
   `removeMiddleware()`, `onRequest()`, `onResponse()`, `onError()`, `transport()`.
 - `ProofAge\Sdk\Exceptions\TransportException` for failures below HTTP (connection refused, DNS,

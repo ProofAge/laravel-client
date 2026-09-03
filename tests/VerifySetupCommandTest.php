@@ -3,6 +3,7 @@
 namespace ProofAge\Laravel\Tests;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 class VerifySetupCommandTest extends TestCase
 {
@@ -53,6 +54,9 @@ class VerifySetupCommandTest extends TestCase
 
     public function test_fails_when_api_call_throws(): void
     {
+        // The container-built client retries a 500 twice with the configured 1000 ms delay;
+        // faked, so the suite does not wait 2 s for real and so the factory path is covered.
+        Sleep::fake();
         Http::fake([
             'api.test.com/*' => Http::response(['error' => ['message' => 'Server Error']], 500),
         ]);

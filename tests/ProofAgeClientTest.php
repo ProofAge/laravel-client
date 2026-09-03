@@ -4,6 +4,7 @@ namespace ProofAge\Laravel\Tests;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use ProofAge\Laravel\Exceptions\AuthenticationException;
 use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\Exceptions\ValidationException;
@@ -26,11 +27,11 @@ class ProofAgeClientTest extends TestCase
         ]);
     }
 
-    private function makeFakedClient(array $fakeResponses): ProofAgeClient
+    private function makeFakedClient(array $fakeResponses, array $overrides = []): ProofAgeClient
     {
         Http::fake($fakeResponses);
 
-        return new ProofAgeClient([
+        return new ProofAgeClient($overrides + [
             'api_key' => 'test-api-key',
             'secret_key' => 'test-secret-key',
             'base_url' => 'https://api.test.com',
@@ -197,5 +198,42 @@ class ProofAgeClientTest extends TestCase
                 && $request->hasHeader('X-HMAC-Signature')
                 && $request->hasHeader('X-API-Key');
         });
+    }
+
+    public function test_the_retry_wait_goes_through_laravels_sleep_so_sleep_fake_records_it(): void
+    {
+        Sleep::fake();
+        $client = $this->makeFakedClient(
+            ['api.test.com/*' => Http::response(['error' => ['message' => 'down']], 503)],
+            ['retry_attempts' => 3, 'retry_delay' => 250],
+        );
+
+        try {
+            $client->workspace()->get();
+        } catch (ProofAgeException) {
+        }
+
+        Sleep::assertSleptTimes(2);
+        Sleep::assertSequence([Sleep::usleep(250_000), Sleep::usleep(250_000)]);
+    }
+
+    public function test_a_faked_sleep_does_not_sleep_for_real(): void
+    {
+        Sleep::fake();
+        $client = $this->makeFakedClient(
+            ['api.test.com/*' => Http::response(['error' => ['message' => 'down']], 503)],
+            ['retry_attempts' => 3, 'retry_delay' => 700],
+        );
+
+        $started = hrtime(true);
+
+        try {
+            $client->workspace()->get();
+        } catch (ProofAgeException) {
+        }
+
+        $elapsedMs = (hrtime(true) - $started) / 1e6;
+
+        $this->assertLessThan(700, $elapsedMs, sprintf('Two 700 ms retry waits under Sleep::fake() took %.0f ms: the client slept for real.', $elapsedMs));
     }
 }
