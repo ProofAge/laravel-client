@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 - Unreleased
+## 0.7.0 - 2026-09-03
 
 The package is now a Laravel integration layer over [`proofage/php-sdk`](https://github.com/ProofAge/php-sdk):
 the service provider, the facade, the webhook middleware, the `proofage:verify-setup` command, and a
