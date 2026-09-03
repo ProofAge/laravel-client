@@ -5,6 +5,7 @@ namespace ProofAge\Laravel\Tests;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 use ProofAge\Laravel\Exceptions\AuthenticationException;
 use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\Exceptions\ValidationException;
@@ -74,7 +75,7 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertSame(SdkVerificationResource::GENDER_MALE, VerificationResource::GENDER_MALE);
     }
 
-    public function test_a_401_is_caught_under_both_the_laravel_and_the_sdk_name(): void
+    public function test_a_401_is_the_laravel_authentication_exception_and_not_the_sdk_one(): void
     {
         Http::fake(['api.test.com/*' => Http::response(['error' => ['message' => 'Invalid API key', 'code' => 'UNAUTHORIZED']], 401)]);
 
@@ -90,7 +91,7 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertSame('UNAUTHORIZED', $thrown->getErrorCode());
     }
 
-    public function test_a_422_is_caught_under_both_names_and_keeps_get_errors(): void
+    public function test_a_422_is_the_laravel_validation_exception_and_not_the_sdk_one_and_keeps_get_errors(): void
     {
         Http::fake(['api.test.com/*' => Http::response([
             'error' => ['message' => 'Validation failed'],
@@ -127,32 +128,52 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertSame('Secret key is required', $thrown->getMessage());
     }
 
-    public function test_the_sdk_base_class_is_the_catch_all_for_every_client_error(): void
+    /** @return iterable<string, array{int}> */
+    public static function everyClientErrorStatus(): iterable
     {
-        foreach ([401, 422, 500] as $status) {
-            Http::fake(['api.test.com/*' => Http::response(['error' => ['message' => "status {$status}"]], $status)]);
-
-            $thrown = $this->thrownBy(fn () => $this->client(['retry_attempts' => 1])->workspace()->get());
-
-            $this->assertInstanceOf(SdkProofAgeException::class, $thrown, "A {$status} must be a ProofAge\\Sdk\\Exceptions\\ProofAgeException.");
-            $this->assertInstanceOf(ExceptionInterface::class, $thrown);
-        }
+        yield '401' => [401];
+        yield '422' => [422];
+        yield '500' => [500];
     }
 
-    public function test_the_laravel_base_class_catches_every_laravel_subclass(): void
+    /**
+     * One test per status rather than a loop: Http::fake() appends its stubs and the first
+     * match wins, so a loop that fakes inside its body only ever exercises the first status.
+     */
+    #[DataProvider('everyClientErrorStatus')]
+    public function test_the_sdk_base_class_is_the_catch_all_for_every_client_error(int $status): void
+    {
+        Http::fake(['api.test.com/*' => Http::response(['error' => ['message' => "status {$status}"]], $status)]);
+
+        $thrown = $this->thrownBy(fn () => $this->client(['retry_attempts' => 1])->workspace()->get());
+
+        $this->assertSame($status, $thrown->getCode(), 'The stub for this status must be the one that answered.');
+        $this->assertInstanceOf(SdkProofAgeException::class, $thrown, "A {$status} must be a ProofAge\\Sdk\\Exceptions\\ProofAgeException.");
+        $this->assertInstanceOf(ExceptionInterface::class, $thrown);
+    }
+
+    /** @return iterable<string, array{int}> */
+    public static function everyStatusWithALaravelSubclass(): iterable
+    {
+        yield '401' => [401];
+        yield '422' => [422];
+    }
+
+    #[DataProvider('everyStatusWithALaravelSubclass')]
+    public function test_the_laravel_base_class_catches_every_laravel_subclass(int $status): void
     {
         // Before 0.7.0 this was the documented handler — examples/laravel-usage.php used it
         // as the sole catch in five methods. If a 401 or a 422 stops matching it, an upgrade
         // turns handled API errors into 500s with nothing at upgrade time to say so. The
         // Laravel subclasses therefore descend from the Laravel base, which descends from the
         // SDK base, so a catch on either base still matches.
-        foreach ([401, 422] as $status) {
-            Http::fake(['api.test.com/*' => Http::response(['error' => ['message' => 'nope']], $status)]);
-            $thrown = $this->thrownBy(fn () => $this->client()->workspace()->get());
+        Http::fake(['api.test.com/*' => Http::response(['error' => ['message' => 'nope']], $status)]);
 
-            $this->assertInstanceOf(ProofAgeException::class, $thrown, "status {$status}");
-            $this->assertInstanceOf(SdkProofAgeException::class, $thrown, "status {$status}");
-        }
+        $thrown = $this->thrownBy(fn () => $this->client()->workspace()->get());
+
+        $this->assertSame($status, $thrown->getCode(), 'The stub for this status must be the one that answered.');
+        $this->assertInstanceOf(ProofAgeException::class, $thrown, "status {$status}");
+        $this->assertInstanceOf(SdkProofAgeException::class, $thrown, "status {$status}");
     }
 
     public function test_the_laravel_validation_exception_still_exposes_its_errors(): void
