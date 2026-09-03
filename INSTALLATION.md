@@ -2,9 +2,12 @@
 
 ## Requirements
 
-- PHP 8.1 or higher
-- Laravel 10.0, 11.0, or 12.0
+- PHP 8.2 or higher
+- Laravel 12 or 13
 - Composer
+
+The package depends on `proofage/php-sdk`, the framework-neutral ProofAge client; Composer installs
+it alongside.
 
 ## Installation Steps
 
@@ -110,12 +113,18 @@ class VerificationService
 
 ## Error Handling
 
-The client throws specific exceptions for different error types:
+Inside a Laravel application the client throws `ProofAge\Laravel\Exceptions\AuthenticationException`
+for a 401, `ValidationException` for a 422 and `ProofAgeException` for every other non-2xx. Catch
+the Laravel name for a specific status, and `ProofAge\Sdk\Exceptions\ProofAgeException` — the base
+class of all of them — for everything; it also catches `ProofAge\Sdk\Exceptions\TransportException`,
+a network failure. (The SDK's own `AuthenticationException` and `ValidationException` are not
+parents of the Laravel classes, so a `catch` on those two names never matches here; see the README's
+Error Handling section.)
 
 ```php
-use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\Exceptions\AuthenticationException;
 use ProofAge\Laravel\Exceptions\ValidationException;
+use ProofAge\Sdk\Exceptions\ProofAgeException;
 
 try {
     $verification = ProofAge::verifications()->create($data);

@@ -6,6 +6,13 @@
 Run `composer run check-release <version>` first — it prints what Packagist serves and refuses a
 number that is already taken or below the published latest.
 
+**It also refuses to release ahead of `proofage/php-sdk`.** This package requires the SDK, which
+consumers resolve from Packagist like everything else. A tag that goes out before Packagist serves
+an SDK version satisfying the `^` constraint in `composer.json` — a bumped constraint, or a first
+release — gives every consumer an unresolvable dependency, so the script checks for one and exits 1
+until it exists. When the SDK gains a minor version this package needs, publish the SDK first,
+bump the constraint here, then release here.
+
 This repo's tags genuinely lie: versions 0.2.9 through 0.5.0 are published on Packagist with no
 tag behind them any more (nobody has established who removed them — the org audit log is not
 reachable and GitHub's events feed carries no tag events for this repo). Reading `git tag` in
@@ -19,10 +26,19 @@ with `check-release`, then `git tag vX.Y.Z && git push origin vX.Y.Z`, then conf
 
 ## Changing the API surface
 
-The API contract lives in the app repo, not here: see `developer-docs/README.md` §
-"Keeping the SDK clients in sync" in `proofageapp`. In short — `composer run sync-spec`, then make
-`tests/ApiContractTest.php` pass by updating `tests/Support/ApiContractMap.php`, the `@param`/
-`@return` shapes in `src/Resources/`, and `AGENTS.md` together. Run tests with
-`vendor/bin/phpunit --no-coverage` (no coverage driver locally). `AGENTS.md` ships to consumers
-and is the authoritative response contract; this file does not ship (see `.gitattributes`), so
-maintainer notes belong here.
+Since 0.7.0 the resources, enums, exceptions, signing and the bundled OpenAPI spec live in
+`proofage/php-sdk` (checked out as the sibling `../proofage-php-sdk`), and so does the contract
+workflow: `composer run sync-spec` and `tests/ApiContractTest.php` are run there, and the
+`@param`/`@return` shapes are on `ProofAge\Sdk\Resources\*`. The classes under `src/Resources/`
+and `src/Exceptions/` here are empty subclasses kept for backwards compatibility; a new resource
+method needs no change in this package beyond the SDK version constraint and, if the facade
+gains a method, its docblock.
+
+What is still owned here: the provider, facade, `IlluminateHttpClient`, the webhook middleware
+(its check order is pinned by `tests/BackwardCompatibilityTest.php`), `VerifySetupCommand`,
+`ConfigResolver`. `tests/BackwardCompatibilityTest.php` is the list of pre-0.7 names that must
+keep working; `tests/IlluminateHttpClientTest.php` is the adapter's contract with the SDK.
+
+Run tests with `vendor/bin/phpunit --no-coverage` (no coverage driver locally). `AGENTS.md` ships
+to consumers and points at the SDK's for the endpoint contract; this file does not ship (see
+`.gitattributes`), so maintainer notes belong here.

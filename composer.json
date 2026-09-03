@@ -14,10 +14,10 @@
     },
     "require": {
         "php": "^8.2",
+        "proofage/php-sdk": "^0.1.2",
         "illuminate/http": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
-        "illuminate/config": "^12.0|^13.0",
-        "psr/http-message": "^1.0|^2.0"
+        "illuminate/config": "^12.0|^13.0"
     },
     "require-dev": {
         "orchestra/testbench": "^10.0|^11.0",
@@ -29,7 +29,10 @@
     "autoload": {
         "psr-4": {
             "ProofAge\\Laravel\\": "src/"
-        }
+        },
+        "files": [
+            "src/Support/dump-casters.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -48,7 +51,6 @@
     },
     "scripts": {
         "test": "phpunit",
-        "sync-spec": "@php scripts/sync-spec.php",
         "check-release": "@php scripts/check-release.php"
     },
     "config": {

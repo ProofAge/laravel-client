@@ -2,61 +2,17 @@
 
 namespace ProofAge\Laravel\Exceptions;
 
-use Exception;
-use Illuminate\Http\Client\Response;
-
-class ProofAgeException extends Exception
-{
-    protected ?Response $response = null;
-
-    protected array $errorData = [];
-
-    public function __construct(string $message = '', int $code = 0, ?Exception $previous = null, ?Response $response = null)
-    {
-        parent::__construct($message, $code, $previous);
-
-        $this->response = $response;
-
-        if ($response) {
-            $this->parseErrorData();
-        }
-    }
-
-    public static function fromResponse(Response $response, string $message = ''): static
-    {
-        $errorMessage = $message ?: 'ProofAge API request failed';
-
-        $json = $response->json();
-        if ($json && isset($json['error']['message'])) {
-            $errorMessage = $json['error']['message'];
-        }
-
-        return new static($errorMessage, $response->status(), null, $response);
-    }
-
-    public function getResponse(): ?Response
-    {
-        return $this->response;
-    }
-
-    public function getErrorData(): array
-    {
-        return $this->errorData;
-    }
-
-    public function getErrorCode(): ?string
-    {
-        return $this->errorData['code'] ?? null;
-    }
-
-    protected function parseErrorData(): void
-    {
-        if ($this->response && $this->response->json()) {
-            $data = $this->response->json();
-
-            if (isset($data['error'])) {
-                $this->errorData = $data['error'];
-            }
-        }
-    }
-}
+/**
+ * The pre-0.7 base exception, kept so existing `catch` blocks keep matching. Inside a Laravel
+ * application the client throws this class for every non-2xx that is not a 401 or a 422, and
+ * for an incomplete configuration; AuthenticationException, ValidationException and
+ * WebhookVerificationException extend it, so a `catch` on this name sees those too, exactly
+ * as it did before 0.7.
+ *
+ * What it does not see is ProofAge\Sdk\Exceptions\TransportException (a failure below HTTP),
+ * which is why the catch-all is the SDK base class this one extends. See UPGRADE.md.
+ *
+ * @deprecated since 0.7.0, removed in 1.0. Catch ProofAge\Sdk\Exceptions\ProofAgeException instead;
+ *             it matches everything this class does, and TransportException as well.
+ */
+class ProofAgeException extends \ProofAge\Sdk\Exceptions\ProofAgeException {}

@@ -6,10 +6,14 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+// Inside a Laravel application the client throws this package's exception classes: catch the
+// Laravel name for a specific status, and the SDK base class for everything — it is the parent of
+// all of them, and of TransportException. The SDK's own AuthenticationException and
+// ValidationException are not parents of the Laravel classes and would never match here (see UPGRADE.md).
 use ProofAge\Laravel\Exceptions\AuthenticationException;
-use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\Exceptions\ValidationException;
 use ProofAge\Laravel\Facades\ProofAge;
+use ProofAge\Sdk\Exceptions\ProofAgeException;
 
 class VerificationController extends Controller
 {

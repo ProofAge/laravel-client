@@ -6,6 +6,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use ProofAge\Laravel\Console\Commands\VerifySetupCommand;
 use ProofAge\Laravel\Middleware\VerifyWebhookSignature;
+use ProofAge\Sdk\Client;
 
 class ProofAgeServiceProvider extends ServiceProvider
 {
@@ -26,6 +27,10 @@ class ProofAgeServiceProvider extends ServiceProvider
         });
 
         $this->app->alias(ProofAgeClient::class, 'proofage');
+
+        // A consumer type-hinting the SDK's class gets the same singleton, not a fresh
+        // cURL-backed client that ignores the app's config and bypasses Http::fake().
+        $this->app->alias(ProofAgeClient::class, Client::class);
     }
 
     /**

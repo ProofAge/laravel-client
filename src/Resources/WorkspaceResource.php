@@ -2,50 +2,9 @@
 
 namespace ProofAge\Laravel\Resources;
 
-use ProofAge\Laravel\ProofAgeClient;
-
-class WorkspaceResource
-{
-    protected ProofAgeClient $client;
-
-    public function __construct(ProofAgeClient $client)
-    {
-        $this->client = $client;
-    }
-
-    /**
-     * Get workspace information.
-     *
-     * @return array{
-     *     id: string,
-     *     name: string,
-     *     flow_type: string,
-     *     mode: string,
-     *     age_mode: string|null,
-     *     age_threshold: int|null,
-     *     verification_type: string,
-     *     redirect_url: string|null,
-     *     webhook_url: string|null,
-     *     allow_expired_documents: bool,
-     *     allow_duplicate_accounts: bool
-     * }|null
-     */
-    public function get(): ?array
-    {
-        $response = $this->client->makeRequest('GET', 'workspace');
-
-        return $response->json();
-    }
-
-    /**
-     * Get consent information.
-     *
-     * @return array{id: int, version: string, text_sha256: string, url: string}|null
-     */
-    public function getConsent(): ?array
-    {
-        $response = $this->client->makeRequest('GET', 'consent');
-
-        return $response->json();
-    }
-}
+/**
+ * The SDK resource under its pre-0.7 name. ProofAgeClient builds this class, so a type hint on
+ * either name is satisfied. Methods and array shapes are the SDK's; see
+ * ProofAge\Sdk\Resources\WorkspaceResource and the SDK's AGENTS.md for the contract.
+ */
+class WorkspaceResource extends \ProofAge\Sdk\Resources\WorkspaceResource {}

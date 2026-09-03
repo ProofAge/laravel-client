@@ -4,10 +4,12 @@ namespace ProofAge\Laravel\Tests;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use ProofAge\Laravel\Exceptions\AuthenticationException;
 use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\Exceptions\ValidationException;
 use ProofAge\Laravel\ProofAgeClient;
+use ProofAge\Sdk\Testing\FakeHttpClient;
 
 class ProofAgeClientTest extends TestCase
 {
@@ -25,11 +27,11 @@ class ProofAgeClientTest extends TestCase
         ]);
     }
 
-    private function makeFakedClient(array $fakeResponses): ProofAgeClient
+    private function makeFakedClient(array $fakeResponses, array $overrides = []): ProofAgeClient
     {
         Http::fake($fakeResponses);
 
-        return new ProofAgeClient([
+        return new ProofAgeClient($overrides + [
             'api_key' => 'test-api-key',
             'secret_key' => 'test-secret-key',
             'base_url' => 'https://api.test.com',
@@ -114,23 +116,25 @@ class ProofAgeClientTest extends TestCase
 
     public function test_it_generates_correct_hmac_signature_for_json_data(): void
     {
-        $method = 'POST';
-        $endpoint = 'verifications';
+        // Signing now lives in the SDK; what this package must guarantee is that the
+        // signature the SDK computed is what leaves through the Http facade, over the
+        // exact bytes sent — here a body whose slashes json_encode() escapes.
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications' => Http::response(['id' => 'ver_123']),
+        ]);
         $data = ['callback_url' => 'https://example.com/webhook'];
         $rawBody = json_encode($data);
 
-        $reflection = new \ReflectionClass($this->client);
-        $methodReflection = $reflection->getMethod('generateHmacSignature');
-        $methodReflection->setAccessible(true);
-
-        $signature = $methodReflection->invoke($this->client, $method, $endpoint, $rawBody);
+        $client->verifications()->create($data);
 
         $expectedCanonical = 'POST/v1/verifications'.$rawBody;
         $expectedSignature = hash_hmac('sha256', $expectedCanonical, 'test-secret-key');
 
-        $this->assertIsString($signature);
-        $this->assertEquals(64, strlen($signature));
-        $this->assertEquals($expectedSignature, $signature);
+        Http::assertSent(function ($request) use ($rawBody, $expectedSignature) {
+            return $request->body() === $rawBody
+                && strlen($request->header('X-HMAC-Signature')[0]) === 64
+                && $request->header('X-HMAC-Signature') === [$expectedSignature];
+        });
     }
 
     public function test_it_can_accept_consent_for_verification(): void
@@ -160,24 +164,23 @@ class ProofAgeClientTest extends TestCase
 
     public function test_from_response_returns_correct_subclass_for_authentication(): void
     {
-        $response = Http::fake([
-            '*' => Http::response(['error' => ['message' => 'Unauthorized']], 401),
-        ])->get('https://example.com');
+        $response = FakeHttpClient::json(['error' => ['message' => 'Unauthorized']], 401);
 
         $exception = AuthenticationException::fromResponse($response);
 
         $this->assertInstanceOf(AuthenticationException::class, $exception);
+        $this->assertSame('Unauthorized', $exception->getMessage());
+        $this->assertSame(401, $exception->getCode());
     }
 
     public function test_from_response_returns_correct_subclass_for_validation(): void
     {
-        $response = Http::fake([
-            '*' => Http::response(['error' => ['message' => 'Validation failed'], 'errors' => ['field' => ['required']]], 422),
-        ])->get('https://example.com');
+        $response = FakeHttpClient::json(['error' => ['message' => 'Validation failed'], 'errors' => ['field' => ['required']]], 422);
 
         $exception = ValidationException::fromResponse($response);
 
         $this->assertInstanceOf(ValidationException::class, $exception);
+        $this->assertSame(['field' => ['required']], $exception->getErrors());
     }
 
     public function test_it_sends_file_upload_as_multipart(): void
@@ -195,5 +198,42 @@ class ProofAgeClientTest extends TestCase
                 && $request->hasHeader('X-HMAC-Signature')
                 && $request->hasHeader('X-API-Key');
         });
+    }
+
+    public function test_the_retry_wait_goes_through_laravels_sleep_so_sleep_fake_records_it(): void
+    {
+        Sleep::fake();
+        $client = $this->makeFakedClient(
+            ['api.test.com/*' => Http::response(['error' => ['message' => 'down']], 503)],
+            ['retry_attempts' => 3, 'retry_delay' => 250],
+        );
+
+        try {
+            $client->workspace()->get();
+        } catch (ProofAgeException) {
+        }
+
+        Sleep::assertSleptTimes(2);
+        Sleep::assertSequence([Sleep::usleep(250_000), Sleep::usleep(250_000)]);
+    }
+
+    public function test_a_faked_sleep_does_not_sleep_for_real(): void
+    {
+        Sleep::fake();
+        $client = $this->makeFakedClient(
+            ['api.test.com/*' => Http::response(['error' => ['message' => 'down']], 503)],
+            ['retry_attempts' => 3, 'retry_delay' => 700],
+        );
+
+        $started = hrtime(true);
+
+        try {
+            $client->workspace()->get();
+        } catch (ProofAgeException) {
+        }
+
+        $elapsedMs = (hrtime(true) - $started) / 1e6;
+
+        $this->assertLessThan(700, $elapsedMs, sprintf('Two 700 ms retry waits under Sleep::fake() took %.0f ms: the client slept for real.', $elapsedMs));
     }
 }

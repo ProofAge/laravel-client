@@ -12,6 +12,8 @@ ProofAge is an online age verification platform enabling websites to confirm use
 
 This package provides a first-class Laravel integration: a service provider with auto-discovery, a facade, HMAC-signed webhook middleware, and a setup verification command.
 
+It is built on [`proofage/php-sdk`](https://github.com/ProofAge/php-sdk), the framework-neutral ProofAge client, which does the request signing, the retries and the resource calls. This package adds the Laravel wiring and sends every request through the `Http` facade, so `Http::fake()` intercepts the client in your tests. Upgrading from 0.6? See [`UPGRADE.md`](UPGRADE.md).
+
 ## Installation
 
 Install the package via Composer:
@@ -135,9 +137,51 @@ ProofAge::verifications('verification-id')->submit();
 ```php
 use ProofAge\Laravel\ProofAgeClient;
 
-$client = app(ProofAgeClient::class);
+$client = app(ProofAgeClient::class);   // app(\ProofAge\Sdk\Client::class) resolves the same singleton
 $workspace = $client->workspace()->get();
+
+// Lower level: makeRequest() returns a ProofAge\Sdk\Http\Response
+$response = $client->makeRequest('GET', 'workspace');
+$response->status();
+$response->json();
 ```
+
+### Middleware and events
+
+`ProofAgeClient` is the SDK client, so its middleware and events are available: a middleware runs once per HTTP attempt, before signing; events observe the signed request and the response, with the API key and signature masked.
+
+```php
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use ProofAge\Laravel\ProofAgeClient;
+use ProofAge\Sdk\Events\ResponseEvent;
+use ProofAge\Sdk\Http\Request;
+use ProofAge\Sdk\Http\Response;
+
+$client = app(ProofAgeClient::class);
+
+$client->pushMiddleware(fn (Request $request, callable $next): Response => $next(
+    $request->withHeader('X-Request-Id', (string) Str::uuid())
+));
+
+$client->onResponse(fn (ResponseEvent $e) => Log::info('proofage.response', [
+    'status' => $e->status(),
+    'attempt' => $e->attempt(),
+    'ms' => $e->durationMs(),
+]));
+```
+
+See the SDK's README for the full middleware and event API and for what `raw()` on an event exposes.
+
+### Secrets in dumps
+
+`dd()`, `dump()`, `print_r()` and `var_dump()` of the client, of a request or of a caught exception
+show the SDK's redacted view: the secret key as `[redacted]`, the API key and the HMAC signature
+masked, a request body as its size and sha256 rather than its bytes. The SDK covers `print_r()` and
+`var_dump()` itself through `__debugInfo()`; this package registers casters with Symfony's
+VarDumper — what Laravel's `dd()` and `dump()` use, and which otherwise reads the real properties by
+reflection — for the same classes when Composer's autoloader loads. `var_export()` and reflection
+are not covered.
 
 ## Webhook Security
 
@@ -286,32 +330,57 @@ Additional workspaces only need `api_key` and `secret_key`. If a workspace conne
 - `verifications(string $id)->estimation()` - Get age-threshold and gender estimation
 - `verifications(string $id)->blockFace(?array $data)` - Block the verification face for AML
 
-Every method's exact request and response shape is documented in `AGENTS.md`, in the
-`@param`/`@return` PHPDoc on `src/Resources/`, and in the bundled `resources/openapi.json`.
+Every method's exact request and response shape is documented in the SDK: its `AGENTS.md`
+(`vendor/proofage/php-sdk/AGENTS.md`), the `@param`/`@return` PHPDoc on `ProofAge\Sdk\Resources\*`,
+and the bundled `vendor/proofage/php-sdk/resources/openapi.json`.
+
+### Enums
+
+`ProofAge\Sdk\Enums\VerificationStatus`, `ProofAge\Sdk\Enums\WebhookReason` and
+`ProofAge\Sdk\Enums\BlockFaceReasonCode` model the `status`, AML `reason` and `reason_code` values.
+(`ProofAge\Laravel\Enums\*` was removed in 0.7.0.)
 
 ## Error Handling
 
-The client throws specific exceptions for different error types:
+Inside a Laravel application, catch the Laravel name for a specific status and the SDK base class
+for everything:
 
 ```php
-use ProofAge\Laravel\Exceptions\ProofAgeException;
-use ProofAge\Laravel\Exceptions\AuthenticationException;
-use ProofAge\Laravel\Exceptions\ValidationException;
+use ProofAge\Laravel\Exceptions\AuthenticationException;   // 401
+use ProofAge\Laravel\Exceptions\ValidationException;       // 422, getErrors()
+use ProofAge\Sdk\Exceptions\TransportException;            // connection refused, DNS, TLS, timeout
+use ProofAge\Sdk\Exceptions\ProofAgeException;             // every other non-2xx, and the base class of all of the above
 
 try {
     $verification = ProofAge::verifications()->create($data);
 } catch (AuthenticationException $e) {
-    // Handle authentication errors
+    // 401: $e->getErrorCode()
 } catch (ValidationException $e) {
-    // Handle validation errors
+    // 422: $e->getErrors()
+} catch (TransportException $e) {
+    // The API could not be reached; $e->getResponse() is null
 } catch (ProofAgeException $e) {
-    // Handle other API errors
+    // Everything else: $e->getCode() is the HTTP status, $e->getResponse() the ProofAge\Sdk\Http\Response
 }
 ```
 
+The client throws `ProofAge\Laravel\Exceptions\AuthenticationException` for a 401,
+`ValidationException` for a 422 and `ProofAgeException` for every other non-2xx; the webhook
+middleware throws `WebhookVerificationException`. All four descend from
+`ProofAge\Laravel\Exceptions\ProofAgeException`, which descends from
+`ProofAge\Sdk\Exceptions\ProofAgeException` — the catch-all, and the only one of the two bases that
+also catches `TransportException`.
+
+They do **not** descend from the SDK's own `ProofAge\Sdk\Exceptions\AuthenticationException`,
+`ValidationException` or `WebhookVerificationException`: PHP allows one parent, and keeping the
+pre-0.7 `catch (ProofAge\Laravel\Exceptions\ProofAgeException)` working won. A `catch` on one of
+those three SDK names therefore never matches inside a Laravel application — a 422 would fall
+through to whatever comes next. The Laravel names are deprecated in 0.7 and removed in 1.0, when
+the SDK names become what is thrown; see `UPGRADE.md`.
+
 ### Webhook Exception Handling
 
-The webhook middleware throws `WebhookVerificationException` on invalid requests. By default, the exception renders a JSON error response:
+The webhook middleware throws `ProofAge\Laravel\Exceptions\WebhookVerificationException` on invalid requests. It descends from `ProofAge\Laravel\Exceptions\ProofAgeException` (not from the SDK's `WebhookVerificationException`; see Error Handling above) and carries `errorCode`, `statusCode` and `toArray()`. By default, the exception renders a JSON error response:
 
 ```json
 {
@@ -364,6 +433,20 @@ public function register(): void
 ```bash
 composer test
 ```
+
+In your own application's tests, `Http::fake()` intercepts every request the client makes, including
+multipart uploads (`$request->hasFile('file')`) and the signed headers (`$request->header('X-HMAC-Signature')`):
+
+```php
+Http::fake(['api.proofage.xyz/v1/workspace' => Http::response(['id' => 'ws_1', 'name' => 'Acme'])]);
+
+ProofAge::workspace()->get();
+
+Http::assertSent(fn ($request) => $request->hasHeader('X-API-Key'));
+```
+
+If you would rather not go through the facade, `ProofAge\Sdk\Testing\FakeHttpClient` is a transport
+double the SDK ships: `new ProofAgeClient($config, $fake)`.
 
 ## Additional Resources
 
