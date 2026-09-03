@@ -2,7 +2,9 @@
 
 namespace ProofAge\Laravel\Tests;
 
+use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response as IlluminateResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -255,6 +257,31 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertSame(Http::get('https://api.test.com/v1/workspace')->headers(), $response->headers(), 'Byte-identical to Illuminate\'s headers() for the same response.');
         $this->assertSame('abc', $response->header('x-trace'));
         $this->assertSame('abc', $response->header('X-TRACE'));
+    }
+
+    public function test_header_returns_null_for_a_missing_header_where_illuminates_returned_an_empty_string(): void
+    {
+        // A documented difference, pinned so UPGRADE.md stays true: Illuminate's header()
+        // was getHeaderLine(), '' when absent; the SDK's is the first value or null.
+        Http::fake(['api.test.com/*' => Http::response(['id' => 'ws_1'], 200)]);
+
+        $response = $this->client()->makeRequest('GET', 'workspace');
+
+        $this->assertNull($response->header('X-Missing'));
+        $this->assertSame('', Http::get('https://api.test.com/v1/workspace')->header('X-Missing'));
+    }
+
+    public function test_a_test_double_of_make_request_returning_an_illuminate_response_fails_loudly(): void
+    {
+        // Documented in UPGRADE.md: the return type is declared, so a Mockery stub written
+        // against 0.6 fails on its first call with a TypeError rather than misbehaving later.
+        $double = \Mockery::mock(ProofAgeClient::class);
+        $double->shouldReceive('makeRequest')->andReturn(new IlluminateResponse(new GuzzleResponse(200, [], '{"id":"ws_1"}')));
+
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('ProofAge\Sdk\Http\Response');
+
+        $double->makeRequest('GET', 'workspace');
     }
 
     public function test_the_webhook_signature_verifier_is_the_sdk_verifier(): void

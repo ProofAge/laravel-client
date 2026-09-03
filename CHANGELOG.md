@@ -9,7 +9,7 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
 
 ### Added
 
-- `proofage/php-sdk ^0.1` as a dependency.
+- `proofage/php-sdk ^0.1.2` as a dependency.
 - `ProofAge\Laravel\Http\IlluminateHttpClient`, the SDK transport that sends through the `Http`
   facade, resolved at send time, so `Http::fake()` in your tests keeps intercepting every request —
   including those made by a client singleton built before the fake was registered.
@@ -30,10 +30,15 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
   facade, the container binding, `ProofAgeClientFactory` and every resource method are unchanged.
 - **Declared break:** `ProofAgeClient::makeRequest()` and `makeStreamedRequest()` return
   `ProofAge\Sdk\Http\Response` instead of `Illuminate\Http\Client\Response`; the same object
-  reaches `ProofAgeException::getResponse()` and `fromResponse()`. The SDK response mirrors
-  `status()`, `body()`, `json()`, `header()`, `headers()`, `successful()`, `failed()` and `ok()`,
-  so code that reads a response needs no change. Only `collect()`, `throw()`, `onError()`,
-  `toPsrResponse()` and explicit type hints on the Illuminate class are affected.
+  reaches `ProofAgeException::getResponse()` and `fromResponse()`. `status()`, `body()`, `json()`
+  (dot path included), `header()`, `headers()`, `successful()`, `failed()` and `ok()` carry over,
+  so code that reads a response needs no change beyond two details: `header()` returns `null`
+  rather than `''` for a missing header (and the first value rather than a comma-joined line), and
+  `json($key)` takes no `*` wildcard. The rest of Illuminate's surface does not exist — the status
+  helpers (`clientError()`, `notFound()`, …), `object()`, `collect()`, `ArrayAccess`,
+  `__toString`, `throw()` and its variants, `toPsrResponse()`, `dd()` — and a test double of
+  `makeRequest()` typed on the Illuminate response fails with a `TypeError`. `UPGRADE.md` lists
+  every method.
 - `ProofAge\Laravel\Resources\VerificationResource` and `WorkspaceResource` are one-line
   subclasses of the SDK resources; `ProofAgeClient` still returns them, so a hint on either name
   is satisfied. `VerificationResource::GENDER_FEMALE` / `GENDER_MALE` are inherited.
@@ -57,7 +62,11 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
   request body `json_encode` cannot produce throws `ProofAgeException('Request body is not
   JSON-encodable')` instead of sending `false`; a query string on an endpoint is signed and sent in
   normalized form (no current endpoint takes one); multipart file contents are read once so the
-  hash signed is the hash of the bytes sent.
+  hash signed is the hash of the bytes sent; `timeout` and the retry settings must be integers
+  (`timeout => 0.5` throws at construction where 0.6 passed it to Guzzle); endpoint path segments
+  are percent-encoded and a `.`/`..` segment, `#`, whitespace or control character throws
+  `\InvalidArgumentException`; `downloadMediaTo()` never leaves an error body or a partial file at
+  the destination. `UPGRADE.md` has the details.
 - `psr/http-message` is no longer a direct requirement; it arrives through the SDK.
 
 ### Deprecated
