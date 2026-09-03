@@ -229,6 +229,34 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertSame('bytes', (string) $streamed->getBody());
     }
 
+    public function test_json_takes_a_dot_path_as_illuminates_did(): void
+    {
+        // `$e->getResponse()->json('error.code')` is the documented way to read the API's
+        // error code, and PHP ignores extra arguments: a json() without the parameters
+        // returned the whole document to that call, silently.
+        Http::fake(['api.test.com/*' => Http::response(['error' => ['code' => 'MEDIA_NOT_FOUND', 'message' => 'No such media']], 404)]);
+
+        $thrown = $this->thrownBy(fn () => $this->client()->verifications('ver_1')->document('med_1'));
+        $response = $thrown->getResponse();
+
+        $this->assertSame('MEDIA_NOT_FOUND', $response->json('error.code'));
+        $this->assertSame('fallback', $response->json('error.missing', 'fallback'));
+        $this->assertSame(['code' => 'MEDIA_NOT_FOUND', 'message' => 'No such media'], $response->json('error'));
+    }
+
+    public function test_headers_keeps_the_servers_spelling_as_illuminates_did_and_header_ignores_case(): void
+    {
+        Http::fake(['api.test.com/*' => Http::response(['id' => 'ws_1'], 200, ['X-Trace' => 'abc', 'Content-Type' => 'application/json'])]);
+
+        $response = $this->client()->makeRequest('GET', 'workspace');
+
+        $this->assertSame(['abc'], $response->headers()['X-Trace'], 'The name as the server sent it, which is what Illuminate\'s headers() returned.');
+        $this->assertArrayNotHasKey('x-trace', $response->headers());
+        $this->assertSame(Http::get('https://api.test.com/v1/workspace')->headers(), $response->headers(), 'Byte-identical to Illuminate\'s headers() for the same response.');
+        $this->assertSame('abc', $response->header('x-trace'));
+        $this->assertSame('abc', $response->header('X-TRACE'));
+    }
+
     public function test_the_webhook_signature_verifier_is_the_sdk_verifier(): void
     {
         $verifier = new WebhookSignatureVerifier('secret', 300);

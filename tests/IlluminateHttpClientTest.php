@@ -138,7 +138,12 @@ class IlluminateHttpClientTest extends TestCase
 
         $this->assertSame(200, $response->status());
         $this->assertSame('image/jpeg', $response->header('Content-Type'));
-        $this->assertSame(['image/jpeg'], $response->headers()['content-type']);
+        $this->assertSame('image/jpeg', $response->header('content-type'), 'header() is case-insensitive, as Illuminate\'s is.');
+        // headers() keeps the names as the server spelled them, exactly as Illuminate's
+        // headers() did (both read the same Guzzle response), so `headers()['Content-Type']`
+        // written against 0.6 keeps working.
+        $this->assertSame(['image/jpeg'], $response->headers()['Content-Type']);
+        $this->assertSame(Http::get($request->url)->headers(), $response->headers());
         $this->assertSame('binary-image-bytes', $response->body());
         $this->assertInstanceOf(StreamInterface::class, $response->getBody());
         $this->assertSame($request, $response->request);
