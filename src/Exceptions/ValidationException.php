@@ -2,9 +2,16 @@
 
 namespace ProofAge\Laravel\Exceptions;
 
+use ProofAge\Sdk\Exceptions\Concerns\HasValidationErrors;
+
 /**
- * HTTP 422 under its pre-0.7 name; what the client throws in a Laravel app. getErrors() is inherited.
+ * Descends from the Laravel base rather than from ProofAge\Sdk\Exceptions\ValidationException,
+ * so that a pre-0.7 `catch (ProofAge\Laravel\Exceptions\ProofAgeException)` still sees a 422.
+ * getErrors() comes from the shared SDK trait, so the two implementations cannot drift.
  *
- * @deprecated since 0.7.0, removed in 1.0. Catch ProofAge\Sdk\Exceptions\ValidationException instead.
+ * @deprecated 0.7.0 Catch ProofAge\Sdk\Exceptions\ValidationException instead. Removed in 1.0.
  */
-class ValidationException extends \ProofAge\Sdk\Exceptions\ValidationException {}
+class ValidationException extends ProofAgeException
+{
+    use HasValidationErrors;
+}

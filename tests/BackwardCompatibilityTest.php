@@ -81,7 +81,11 @@ class BackwardCompatibilityTest extends TestCase
         $thrown = $this->thrownBy(fn () => $this->client()->workspace()->get());
 
         $this->assertInstanceOf(AuthenticationException::class, $thrown);
-        $this->assertInstanceOf(SdkAuthenticationException::class, $thrown);
+        // Not the SDK's own AuthenticationException: single inheritance forces a choice, and
+        // keeping the pre-0.7 catch working wins over matching the SDK's 401 subclass, which
+        // no consumer can yet be catching — that namespace ships for the first time in 0.7.0.
+        $this->assertNotInstanceOf(SdkAuthenticationException::class, $thrown);
+        $this->assertInstanceOf(SdkProofAgeException::class, $thrown);
         $this->assertSame(401, $thrown->getCode());
         $this->assertSame('UNAUTHORIZED', $thrown->getErrorCode());
     }
@@ -96,7 +100,9 @@ class BackwardCompatibilityTest extends TestCase
         $thrown = $this->thrownBy(fn () => $this->client()->verifications()->create(['callback_url' => 'x']));
 
         $this->assertInstanceOf(ValidationException::class, $thrown);
-        $this->assertInstanceOf(SdkValidationException::class, $thrown);
+        $this->assertNotInstanceOf(SdkValidationException::class, $thrown);
+        $this->assertInstanceOf(SdkProofAgeException::class, $thrown);
+        // getErrors() survives the re-parenting because it comes from the shared SDK trait.
         $this->assertSame(['callback_url' => ['The callback url field is required.']], $thrown->getErrors());
     }
 
@@ -133,19 +139,34 @@ class BackwardCompatibilityTest extends TestCase
         }
     }
 
-    public function test_the_laravel_base_class_does_not_catch_the_laravel_401_and_422_subclasses(): void
+    public function test_the_laravel_base_class_catches_every_laravel_subclass(): void
     {
-        // Deliberate, and documented in UPGRADE.md: the Laravel AuthenticationException and
-        // ValidationException extend their SDK counterparts so that a `catch` on either name
-        // matches. PHP has single inheritance, so they cannot also extend the Laravel base
-        // class; a pre-0.7 `catch (ProofAge\Laravel\Exceptions\ProofAgeException)` used as the
-        // sole handler therefore no longer sees a 401 or a 422. Flip this test only together
-        // with the parents of those two classes and the UPGRADE.md entry.
-        Http::fake(['api.test.com/*' => Http::response(['error' => ['message' => 'nope']], 401)]);
+        // Before 0.7.0 this was the documented handler — examples/laravel-usage.php used it
+        // as the sole catch in five methods. If a 401 or a 422 stops matching it, an upgrade
+        // turns handled API errors into 500s with nothing at upgrade time to say so. The
+        // Laravel subclasses therefore descend from the Laravel base, which descends from the
+        // SDK base, so a catch on either base still matches.
+        foreach ([401, 422] as $status) {
+            Http::fake(['api.test.com/*' => Http::response(['error' => ['message' => 'nope']], $status)]);
+            $thrown = $this->thrownBy(fn () => $this->client()->workspace()->get());
+
+            $this->assertInstanceOf(ProofAgeException::class, $thrown, "status {$status}");
+            $this->assertInstanceOf(SdkProofAgeException::class, $thrown, "status {$status}");
+        }
+    }
+
+    public function test_the_laravel_validation_exception_still_exposes_its_errors(): void
+    {
+        // getErrors() comes from the SDK trait rather than from SDK inheritance now.
+        Http::fake(['api.test.com/*' => Http::response([
+            'error' => ['message' => 'invalid'],
+            'errors' => ['external_id' => ['The external id field is required.']],
+        ], 422)]);
+
         $thrown = $this->thrownBy(fn () => $this->client()->workspace()->get());
 
-        $this->assertNotInstanceOf(ProofAgeException::class, $thrown);
-        $this->assertInstanceOf(SdkProofAgeException::class, $thrown);
+        $this->assertInstanceOf(ValidationException::class, $thrown);
+        $this->assertSame(['external_id' => ['The external id field is required.']], $thrown->getErrors());
     }
 
     public function test_a_network_failure_is_a_transport_exception_inside_the_sdk_family(): void
@@ -200,11 +221,14 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertFalse($verifier->verify('{"status":"declined"}', $timestamp, $signature));
     }
 
-    public function test_the_webhook_verification_exception_is_the_sdk_exception_and_renders_its_own_body(): void
+    public function test_the_webhook_verification_exception_renders_its_own_body(): void
     {
         $exception = new WebhookVerificationException('INVALID_SIGNATURE', 'HMAC signature is invalid');
 
-        $this->assertInstanceOf(SdkWebhookVerificationException::class, $exception);
+        // Same trade as the 401 and 422 classes: it descends from the Laravel base so the
+        // pre-0.7 catch keeps working, and carries the SDK's body through a shared trait.
+        $this->assertNotInstanceOf(SdkWebhookVerificationException::class, $exception);
+        $this->assertInstanceOf(ProofAgeException::class, $exception);
         $this->assertInstanceOf(SdkProofAgeException::class, $exception);
 
         $rendered = $exception->render(request());

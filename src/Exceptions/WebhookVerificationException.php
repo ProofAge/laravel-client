@@ -2,15 +2,18 @@
 
 namespace ProofAge\Laravel\Exceptions;
 
+use ProofAge\Sdk\Exceptions\Concerns\DescribesWebhookFailure;
+
 /**
- * What the proofage.verify_webhook middleware throws. Extends the SDK exception, which
- * carries errorCode, statusCode and toArray(); this subclass adds the render() Laravel's
- * exception handler calls, so an unhandled failure answers with the documented JSON body.
+ * Descends from the Laravel base for the same reason as ValidationException, and adds the
+ * render() Laravel's exception handler calls to turn a rejected webhook into a JSON response.
  *
- * @deprecated since 0.7.0 as a name to catch, removed in 1.0. Catch ProofAge\Sdk\Exceptions\WebhookVerificationException instead.
+ * @deprecated 0.7.0 Catch ProofAge\Sdk\Exceptions\WebhookVerificationException instead. Removed in 1.0.
  */
-class WebhookVerificationException extends \ProofAge\Sdk\Exceptions\WebhookVerificationException
+class WebhookVerificationException extends ProofAgeException
 {
+    use DescribesWebhookFailure;
+
     public function render($request)
     {
         return response()->json($this->toArray(), $this->statusCode);

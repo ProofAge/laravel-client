@@ -26,30 +26,31 @@ use ProofAge\Sdk\Enums\BlockFaceReasonCode;
 The cases and values are identical. This is the only edit an upgrade requires; an app that does not
 use the enums needs none.
 
-### Check: a catch-all on the Laravel base exception
+### Exceptions: nothing to change
 
 The client still throws `ProofAge\Laravel\Exceptions\AuthenticationException` for a 401,
-`ValidationException` for a 422 and `ProofAgeException` for everything else, and every existing
-`catch` on those names still matches. What changed is their parents: each now extends its
-`ProofAge\Sdk\Exceptions\*` counterpart so that a `catch` on the SDK name matches too, and PHP's
-single inheritance means `AuthenticationException` and `ValidationException` therefore no longer
-extend the Laravel `ProofAgeException`.
+`ValidationException` for a 422, `WebhookVerificationException` for a rejected webhook and
+`ProofAgeException` for everything else. Every existing `catch` on those names still matches,
+including a `catch (ProofAge\Laravel\Exceptions\ProofAgeException $e)` used as the sole
+handler — it still sees a 401 and a 422, exactly as before 0.7.0.
 
-If a `catch (ProofAge\Laravel\Exceptions\ProofAgeException $e)` is your **only** handler, it no
-longer sees a 401 or a 422. Catch the SDK base class instead, which every SDK and Laravel
-exception extends:
+What is new is that all of them also descend from `ProofAge\Sdk\Exceptions\ProofAgeException`,
+so a catch-all on the SDK base works too and is the form to prefer in new code:
 
 ```php
-// before: caught 401, 422 and everything else
-} catch (\ProofAge\Laravel\Exceptions\ProofAgeException $e) {
-
-// after
 } catch (\ProofAge\Sdk\Exceptions\ProofAgeException $e) {
 ```
 
-A handler that lists `AuthenticationException` and `ValidationException` before the base class,
-as the README always showed, is unaffected. The same applies in a webhook controller:
-`ProofAge\Laravel\Exceptions\WebhookVerificationException` extends the SDK's, not the Laravel base.
+One consequence of PHP's single inheritance is worth knowing if you write new code against the
+SDK names: the Laravel 401, 422 and webhook classes descend from the Laravel base, so they are
+**not** instances of `ProofAge\Sdk\Exceptions\AuthenticationException`,
+`ValidationException` or `WebhookVerificationException`. Inside a Laravel application, catch the
+Laravel names for a specific status, or the SDK base for everything. `getErrors()` and
+`toArray()` behave identically on both sides; they come from a trait the SDK shares with this
+package.
+
+The four Laravel exception classes are `@deprecated` in 0.7.0 and removed in 1.0, when the SDK
+names become the only ones.
 
 ### Check: `makeRequest()` returns the SDK response
 

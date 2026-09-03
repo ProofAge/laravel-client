@@ -36,11 +36,12 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
 - `ProofAge\Laravel\Resources\VerificationResource` and `WorkspaceResource` are one-line
   subclasses of the SDK resources; `ProofAgeClient` still returns them, so a hint on either name
   is satisfied. `VerificationResource::GENDER_FEMALE` / `GENDER_MALE` are inherited.
-- `ProofAge\Laravel\Exceptions\ProofAgeException`, `AuthenticationException`,
-  `ValidationException` and `WebhookVerificationException` extend their SDK counterparts.
-  Consequence: `AuthenticationException` and `ValidationException` no longer extend the Laravel
-  `ProofAgeException`, so a `catch` on that class **alone** does not see a 401 or a 422 any more;
-  the catch-all is `ProofAge\Sdk\Exceptions\ProofAgeException`.
+- `ProofAge\Laravel\Exceptions\ProofAgeException` extends the SDK base;
+  `AuthenticationException`, `ValidationException` and `WebhookVerificationException` extend the
+  Laravel base, as before. A `catch` on the Laravel base therefore still sees a 401 and a 422,
+  and a `catch` on the SDK base sees everything. Single inheritance is why they descend from the
+  Laravel base and not from the SDK's own 401/422/webhook classes; `getErrors()` and `toArray()`
+  come from traits shared with the SDK, so the two sides cannot drift.
 - `WebhookVerificationException::render()` stays on the Laravel class and now renders the SDK's
   `toArray()`; the JSON body and status are unchanged.
 - The `proofage.verify_webhook` middleware delegates the check sequence to
