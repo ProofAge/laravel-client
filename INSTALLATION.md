@@ -113,14 +113,18 @@ class VerificationService
 
 ## Error Handling
 
-The client throws specific exceptions for different error types. They are the SDK's exception
-classes (the `ProofAge\Laravel\Exceptions\*` names still work and are deprecated); a network failure
-is `ProofAge\Sdk\Exceptions\TransportException`, which the base class below also catches:
+Inside a Laravel application the client throws `ProofAge\Laravel\Exceptions\AuthenticationException`
+for a 401, `ValidationException` for a 422 and `ProofAgeException` for every other non-2xx. Catch
+the Laravel name for a specific status, and `ProofAge\Sdk\Exceptions\ProofAgeException` — the base
+class of all of them — for everything; it also catches `ProofAge\Sdk\Exceptions\TransportException`,
+a network failure. (The SDK's own `AuthenticationException` and `ValidationException` are not
+parents of the Laravel classes, so a `catch` on those two names never matches here; see the README's
+Error Handling section.)
 
 ```php
+use ProofAge\Laravel\Exceptions\AuthenticationException;
+use ProofAge\Laravel\Exceptions\ValidationException;
 use ProofAge\Sdk\Exceptions\ProofAgeException;
-use ProofAge\Sdk\Exceptions\AuthenticationException;
-use ProofAge\Sdk\Exceptions\ValidationException;
 
 try {
     $verification = ProofAge::verifications()->create($data);

@@ -270,13 +270,33 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertTrue(WebhookReason::isAmlBlocklist('aml.blocklist.face_match'));
     }
 
-    public function test_the_retained_laravel_exception_classes_are_marked_deprecated(): void
+    public function test_the_retained_laravel_exception_classes_are_marked_deprecated_with_advice_that_works(): void
     {
-        foreach ([ProofAgeException::class, AuthenticationException::class, ValidationException::class, WebhookVerificationException::class] as $class) {
-            $doc = (string) (new \ReflectionClass($class))->getDocComment();
+        // The notice is what an IDE shows on hover, so it is the advice most likely to be
+        // followed. "Catch ProofAge\Sdk\Exceptions\ValidationException instead" would send
+        // every 422 past the reader's handler (see test_a_422_is_the_laravel_validation_exception...).
+        $base = $this->docCommentAsProse(ProofAgeException::class);
+
+        $this->assertStringContainsString('@deprecated', $base);
+        $this->assertStringContainsString('Catch ProofAge\Sdk\Exceptions\ProofAgeException instead', $base, 'The SDK base is a strict superset of the Laravel base, so this advice is right.');
+
+        foreach ([AuthenticationException::class, ValidationException::class, WebhookVerificationException::class] as $class) {
+            $doc = $this->docCommentAsProse($class);
+            $short = substr(strrchr($class, '\\'), 1);
 
             $this->assertStringContainsString('@deprecated', $doc, "{$class} must carry the 0.7.0 deprecation notice.");
+            $this->assertStringNotContainsString("Catch ProofAge\\Sdk\\Exceptions\\{$short} instead", $doc, "{$class}: that catch never matches inside a Laravel application.");
+            $this->assertStringContainsString('or ProofAge\Sdk\Exceptions\ProofAgeException for every error', $doc, "{$class} must name the one SDK class that does catch it.");
+            $this->assertStringContainsString("ProofAge\\Sdk\\Exceptions\\{$short} does not match", $doc, "{$class} must say which SDK name does not match it.");
         }
+    }
+
+    /** The class docblock with the comment decoration and line wrapping removed. */
+    private function docCommentAsProse(string $class): string
+    {
+        $doc = (string) (new \ReflectionClass($class))->getDocComment();
+
+        return trim((string) preg_replace('/\s*\n\s*\*\s*/', ' ', $doc));
     }
 
     /**

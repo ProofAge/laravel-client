@@ -43,12 +43,14 @@ Methods on `ProofAge::workspace()` and `ProofAge::verifications($id)` return dec
   checks that the workspace's `webhook_url` has a POST route protected by the middleware with the
   matching prefix. Exit 0 on success (warns when webhooks are not configured), 1 on failure.
 - **Exceptions** thrown by the client: `ProofAge\Laravel\Exceptions\AuthenticationException` (401),
-  `ValidationException` (422, `getErrors()`), `ProofAgeException` (other statuses, configuration).
-  Each extends its `ProofAge\Sdk\Exceptions\*` counterpart, so a `catch` on either name matches;
-  the catch-all is `ProofAge\Sdk\Exceptions\ProofAgeException` (the Laravel base class does not
-  catch the Laravel 401/422 subclasses). Network failures are
-  `ProofAge\Sdk\Exceptions\TransportException`. The four Laravel classes are deprecated names,
-  removed in 1.0.
+  `ValidationException` (422, `getErrors()`), `ProofAgeException` (other statuses, configuration);
+  by the middleware: `WebhookVerificationException`. All four descend from the Laravel
+  `ProofAgeException`, which descends from `ProofAge\Sdk\Exceptions\ProofAgeException` — the
+  catch-all, and the only one that also catches `ProofAge\Sdk\Exceptions\TransportException`
+  (network failures). None of them is an instance of the SDK's own `AuthenticationException`,
+  `ValidationException` or `WebhookVerificationException`, so a `catch` on those three SDK names
+  never matches inside a Laravel application: catch the Laravel name for a specific status, or the
+  SDK base for everything. The four Laravel classes are deprecated names, removed in 1.0.
 - **Enums**: `ProofAge\Sdk\Enums\VerificationStatus`, `WebhookReason`, `BlockFaceReasonCode`.
   There is no `ProofAge\Laravel\Enums\*` since 0.7.0.
 

@@ -95,10 +95,11 @@ exception.
 ### Deprecated: the four Laravel exception classes
 
 `ProofAge\Laravel\Exceptions\ProofAgeException`, `AuthenticationException`, `ValidationException`
-and `WebhookVerificationException` are marked `@deprecated` in 0.7.0 and are removed in 1.0. They
-are still the classes thrown, and a `catch` on them keeps working for the whole 0.x line; when you
-next touch such a `catch`, name the `ProofAge\Sdk\Exceptions\*` parent, which the client satisfies
-already.
+and `WebhookVerificationException` are marked `@deprecated` in 0.7.0 and are removed in 1.0, when
+the SDK's own classes become what is thrown. They are still the classes thrown, and a `catch` on
+them keeps working for the whole 0.x line. When you next touch such a `catch`, the only SDK name
+that matches today is the base, `ProofAge\Sdk\Exceptions\ProofAgeException`; keep the Laravel name
+for a specific status until 1.0.
 
 ### Behaviour changes inherited from the SDK
 

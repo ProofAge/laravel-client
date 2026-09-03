@@ -14,7 +14,8 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
   facade, resolved at send time, so `Http::fake()` in your tests keeps intercepting every request —
   including those made by a client singleton built before the fake was registered.
 - `ProofAge\Laravel\Exceptions\LaravelExceptionFactory`: the SDK client throws this package's
-  exception classes, so a `catch` on either the pre-0.7 name or the SDK name matches.
+  exception classes, so every pre-0.7 `catch` keeps matching, and so does a `catch` on the SDK
+  base `ProofAge\Sdk\Exceptions\ProofAgeException`.
 - `app(\ProofAge\Sdk\Client::class)` resolves the same singleton as `app(ProofAgeClient::class)`.
 - Everything the SDK client offers is available on `ProofAgeClient`: `pushMiddleware()`,
   `removeMiddleware()`, `onRequest()`, `onResponse()`, `onError()`, `transport()`.
@@ -40,8 +41,10 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
   `AuthenticationException`, `ValidationException` and `WebhookVerificationException` extend the
   Laravel base, as before. A `catch` on the Laravel base therefore still sees a 401 and a 422,
   and a `catch` on the SDK base sees everything. Single inheritance is why they descend from the
-  Laravel base and not from the SDK's own 401/422/webhook classes; `getErrors()` and `toArray()`
-  come from traits shared with the SDK, so the two sides cannot drift.
+  Laravel base and not from the SDK's own 401/422/webhook classes — which also means a `catch` on
+  `ProofAge\Sdk\Exceptions\AuthenticationException`, `ValidationException` or
+  `WebhookVerificationException` never matches inside a Laravel application; `getErrors()` and
+  `toArray()` come from traits shared with the SDK, so the two sides cannot drift.
 - `WebhookVerificationException::render()` stays on the Laravel class and now renders the SDK's
   `toArray()`; the JSON body and status are unchanged.
 - The `proofage.verify_webhook` middleware delegates the check sequence to
@@ -61,7 +64,9 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
 
 - `ProofAge\Laravel\Exceptions\ProofAgeException`, `AuthenticationException`, `ValidationException`
   and `WebhookVerificationException` as names to catch. They are still what the client and the
-  middleware throw, and are removed in 1.0; catch the `ProofAge\Sdk\Exceptions\*` parents.
+  middleware throw, and are removed in 1.0, when the SDK's own classes become what is thrown.
+  Until then, catch the Laravel name for a specific status, or `ProofAge\Sdk\Exceptions\ProofAgeException`
+  for everything; the SDK's 401, 422 and webhook classes do not match inside a Laravel application.
 
 ### Removed
 

@@ -332,36 +332,45 @@ and the bundled `vendor/proofage/php-sdk/resources/openapi.json`.
 
 ## Error Handling
 
-The client throws specific exceptions for different error types:
+Inside a Laravel application, catch the Laravel name for a specific status and the SDK base class
+for everything:
 
 ```php
-use ProofAge\Sdk\Exceptions\AuthenticationException;   // 401
-use ProofAge\Sdk\Exceptions\ValidationException;       // 422, getErrors()
-use ProofAge\Sdk\Exceptions\TransportException;        // connection refused, DNS, TLS, timeout
-use ProofAge\Sdk\Exceptions\ProofAgeException;         // every other non-2xx, and the base class
+use ProofAge\Laravel\Exceptions\AuthenticationException;   // 401
+use ProofAge\Laravel\Exceptions\ValidationException;       // 422, getErrors()
+use ProofAge\Sdk\Exceptions\TransportException;            // connection refused, DNS, TLS, timeout
+use ProofAge\Sdk\Exceptions\ProofAgeException;             // every other non-2xx, and the base class of all of the above
 
 try {
     $verification = ProofAge::verifications()->create($data);
 } catch (AuthenticationException $e) {
-    // Handle authentication errors
+    // 401: $e->getErrorCode()
 } catch (ValidationException $e) {
-    // Handle validation errors: $e->getErrors()
+    // 422: $e->getErrors()
 } catch (TransportException $e) {
     // The API could not be reached; $e->getResponse() is null
 } catch (ProofAgeException $e) {
-    // Handle other API errors: $e->getCode() is the HTTP status, $e->getResponse() the ProofAge\Sdk\Http\Response
+    // Everything else: $e->getCode() is the HTTP status, $e->getResponse() the ProofAge\Sdk\Http\Response
 }
 ```
 
-What is actually thrown inside a Laravel app is `ProofAge\Laravel\Exceptions\AuthenticationException`,
-`ValidationException` and `ProofAgeException`, each a subclass of the SDK class above, so a `catch`
-on either name matches. The Laravel names are deprecated in 0.7 and removed in 1.0. Because the
-Laravel 401 and 422 classes extend the SDK classes, the catch-all for every error is the SDK's
-`ProofAgeException`, not the Laravel one — see `UPGRADE.md`.
+The client throws `ProofAge\Laravel\Exceptions\AuthenticationException` for a 401,
+`ValidationException` for a 422 and `ProofAgeException` for every other non-2xx; the webhook
+middleware throws `WebhookVerificationException`. All four descend from
+`ProofAge\Laravel\Exceptions\ProofAgeException`, which descends from
+`ProofAge\Sdk\Exceptions\ProofAgeException` — the catch-all, and the only one of the two bases that
+also catches `TransportException`.
+
+They do **not** descend from the SDK's own `ProofAge\Sdk\Exceptions\AuthenticationException`,
+`ValidationException` or `WebhookVerificationException`: PHP allows one parent, and keeping the
+pre-0.7 `catch (ProofAge\Laravel\Exceptions\ProofAgeException)` working won. A `catch` on one of
+those three SDK names therefore never matches inside a Laravel application — a 422 would fall
+through to whatever comes next. The Laravel names are deprecated in 0.7 and removed in 1.0, when
+the SDK names become what is thrown; see `UPGRADE.md`.
 
 ### Webhook Exception Handling
 
-The webhook middleware throws `ProofAge\Laravel\Exceptions\WebhookVerificationException` on invalid requests (a subclass of `ProofAge\Sdk\Exceptions\WebhookVerificationException`, which carries `errorCode`, `statusCode` and `toArray()`). By default, the exception renders a JSON error response:
+The webhook middleware throws `ProofAge\Laravel\Exceptions\WebhookVerificationException` on invalid requests. It descends from `ProofAge\Laravel\Exceptions\ProofAgeException` (not from the SDK's `WebhookVerificationException`; see Error Handling above) and carries `errorCode`, `statusCode` and `toArray()`. By default, the exception renders a JSON error response:
 
 ```json
 {
