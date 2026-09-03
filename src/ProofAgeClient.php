@@ -29,7 +29,7 @@ class ProofAgeClient extends Client
      *                                           Illuminate\Support\Sleep::usleep(), so Sleep::fake() in a
      *                                           test records the wait instead of the suite sleeping for real.
      */
-    public function __construct(array $config = [], ?HttpClient $transport = null, ?ExceptionFactory $exceptions = null, ?callable $sleep = null)
+    public function __construct(#[\SensitiveParameter] array $config = [], ?HttpClient $transport = null, ?ExceptionFactory $exceptions = null, ?callable $sleep = null)
     {
         parent::__construct(
             $config,

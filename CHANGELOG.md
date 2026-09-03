@@ -20,6 +20,12 @@ the webhook verifier are the SDK's. See `UPGRADE.md` for what a consumer has to 
 - The wait between retry attempts goes through `Illuminate\Support\Sleep::usleep()`, so
   `Sleep::fake()` covers it in your tests; `ProofAgeClient::__construct()` takes the sleeper as its
   fourth argument, as the SDK's `Client` does.
+- Casters for Symfony's VarDumper, registered when Composer's autoloader loads, so `dd()` and
+  `dump()` of the client, a request, a webhook verifier or a caught exception show the SDK's
+  redacted view (secret key `[redacted]`, API key and signature masked, bodies as size and sha256)
+  instead of the real properties VarDumper reads by reflection. `ProofAgeClient::__construct()`
+  marks its `$config` `#[\SensitiveParameter]`, as the SDK's does, so a constructor failure's
+  trace does not carry the keys either.
 - Everything the SDK client offers is available on `ProofAgeClient`: `pushMiddleware()`,
   `removeMiddleware()`, `onRequest()`, `onResponse()`, `onError()`, `transport()`.
 - `ProofAge\Sdk\Exceptions\TransportException` for failures below HTTP (connection refused, DNS,

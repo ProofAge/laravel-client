@@ -51,6 +51,10 @@ Methods on `ProofAge::workspace()` and `ProofAge::verifications($id)` return dec
   `ValidationException` or `WebhookVerificationException`, so a `catch` on those three SDK names
   never matches inside a Laravel application: catch the Laravel name for a specific status, or the
   SDK base for everything. The four Laravel classes are deprecated names, removed in 1.0.
+- **Dump redaction**: `ProofAge\Laravel\Support\DumpCasters` registers VarDumper casters when the
+  autoloader loads (composer `files`), so `dd()` / `dump()` of the client, an SDK `Request`, a body
+  part, a webhook verifier, or an exception carrying any of them show the SDK's `__debugInfo()`
+  view: secret key `[redacted]`, API key and signature masked, bodies as size and sha256.
 - **Enums**: `ProofAge\Sdk\Enums\VerificationStatus`, `WebhookReason`, `BlockFaceReasonCode`.
   There is no `ProofAge\Laravel\Enums\*` since 0.7.0.
 

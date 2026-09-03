@@ -173,6 +173,16 @@ $client->onResponse(fn (ResponseEvent $e) => Log::info('proofage.response', [
 
 See the SDK's README for the full middleware and event API and for what `raw()` on an event exposes.
 
+### Secrets in dumps
+
+`dd()`, `dump()`, `print_r()` and `var_dump()` of the client, of a request or of a caught exception
+show the SDK's redacted view: the secret key as `[redacted]`, the API key and the HMAC signature
+masked, a request body as its size and sha256 rather than its bytes. The SDK covers `print_r()` and
+`var_dump()` itself through `__debugInfo()`; this package registers casters with Symfony's
+VarDumper — what Laravel's `dd()` and `dump()` use, and which otherwise reads the real properties by
+reflection — for the same classes when Composer's autoloader loads. `var_export()` and reflection
+are not covered.
+
 ## Webhook Security
 
 The package includes middleware to verify HMAC signatures on incoming webhook requests from ProofAge.

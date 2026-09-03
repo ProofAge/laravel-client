@@ -29,7 +29,10 @@
     "autoload": {
         "psr-4": {
             "ProofAge\\Laravel\\": "src/"
-        }
+        },
+        "files": [
+            "src/Support/dump-casters.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

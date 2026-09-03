@@ -163,5 +163,7 @@ for a specific status until 1.0.
 - `app(\ProofAge\Sdk\Client::class)` resolves the same singleton as `app(ProofAgeClient::class)`.
 - `ProofAgeClient` inherits the SDK's middleware and events: `pushMiddleware()`, `onRequest()`,
   `onResponse()`, `onError()`. See the SDK's README.
+- `dd($client)`, `dd($e)` and `dump()` show the SDK's redacted view: secret key `[redacted]`, API
+  key and signature masked, bodies as size and sha256. See "Secrets in dumps" in the README.
 - `ProofAge\Sdk\Testing\FakeHttpClient` is available for tests that want a transport double
   instead of `Http::fake()`: `new ProofAgeClient($config, $fake)`.
