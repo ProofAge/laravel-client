@@ -7,7 +7,28 @@ spec at `vendor/proofage/php-sdk/resources/openapi.json` and the `@param`/`@retu
 `ProofAge\Sdk\Resources\*`. Nothing about that contract is duplicated here.
 
 Methods on `ProofAge::workspace()` and `ProofAge::verifications($id)` return decoded JSON as
-`array|null`; they are the SDK resources under this package's names.
+`array|null`; they are the SDK resources under this package's names. The API never wraps a body
+in `data`. `uploadMedia()` and `submit()` return `null` (the API answers an empty `200`),
+`blockFace()` returns `null` (`204`), `downloadMedia()` a PSR-7 stream.
+
+## Integration facts that are easy to get wrong
+
+- `callback_url` on `create()` is where the person's **browser** is sent after the flow (echoed as
+  `redirect_url`), not a webhook URL. Correlate with `external_id` / `external_metadata`, which
+  come back in every response and webhook; `metadata` is stored but never returned.
+- `acceptConsent()` takes exactly the `id` and `text_sha256` of `ProofAge::workspace()->getConsent()`
+  (the active version); any other pair is rejected.
+- `uploadMedia()`: `type` is `selfie`, `liveness_selfie` or `document`; a document also needs
+  `side` (`front`|`back`) and `document` (`id`|`driver_license`|`passport`|`residence_permit`).
+  Images only. `document_front` / `document_back` are media types in `document()`'s output, not
+  inputs.
+- `status` may be `documents_required`, which is not a `VerificationStatus` case: use `tryFrom()`.
+- Webhooks: one URL per workspace, set in the ProofAge console, not per verification. One body
+  shape (`verification_id`, `status`, `external_id`, `external_metadata`, `reason`, `timestamp`,
+  plus `duplicate_*`, `fingerprint_signals`, `manual_moderation` when present) — there is no
+  `event_type`. `X-ProofAge-Webhook-Delivery-Id` is stable across retries of a delivery. The route
+  needs no CSRF check: put it in `routes/api.php`, or exclude it in `validateCsrfTokens(except:)`.
+  Webhooks are signed with the workspace's **active** secret key only.
 
 ## What this package adds
 

@@ -63,9 +63,16 @@ return [
     'version' => env('PROOFAGE_VERSION', 'v1'),
     'timeout' => env('PROOFAGE_TIMEOUT', 30),
     'retry_attempts' => env('PROOFAGE_RETRY_ATTEMPTS', 3),
-    'retry_delay' => env('PROOFAGE_RETRY_DELAY', 1000),
+    'retry_delay' => env('PROOFAGE_RETRY_DELAY', 1000), // milliseconds
+    'download_retry_attempts' => env('PROOFAGE_DOWNLOAD_RETRY_ATTEMPTS', 1),
+    'webhook_tolerance' => env('PROOFAGE_WEBHOOK_TOLERANCE', 300), // seconds
 ];
 ```
+
+`download_retry_attempts` is the number of attempts for `downloadMedia()` / `downloadMediaTo()`;
+1 means no in-process retry, and raising it retries connection failures only, never an HTTP
+status. `webhook_tolerance` is how far `X-Timestamp` on an incoming webhook may be from the
+server clock before the `proofage.verify_webhook` middleware rejects it.
 
 ## Usage Examples
 
@@ -79,10 +86,21 @@ $workspace = ProofAge::workspace()->get();
 
 // Create verification
 $verification = ProofAge::verifications()->create([
-    'callback_url' => 'https://your-app.com/webhook',
-    'metadata' => ['user_id' => 123]
+    // Where the person's browser returns after the flow: a page of your app, not a webhook
+    'callback_url' => 'https://your-app.com/verification/done',
+    // Echoed back in responses and webhooks, so the webhook can find the user
+    'external_id' => (string) $user->id,
+    'external_metadata' => ['plan' => 'pro'],
 ]);
+
+// Send the person to the hosted flow
+return redirect()->away($verification['url']);
 ```
+
+Decisions are POSTed to the workspace's webhook URL, which is set in the workspace settings of
+the ProofAge console, not per verification. See the README's Webhook Security section for the
+route and its middleware. (`metadata` is also accepted, but it is stored internally and never
+returned, so it cannot be used to match a webhook to a user.)
 
 ### Direct Client Usage
 
@@ -171,9 +189,19 @@ Or if you've cloned the repository:
 3. **Network Timeouts**: Increase the timeout value in configuration
 4. **SSL Issues**: Ensure your server can make HTTPS requests to the ProofAge API
 
-### Debug Mode
+### Seeing requests and responses
 
-Enable debug logging by setting `LOG_LEVEL=debug` in your `.env` file to see detailed HTTP request/response information.
+The package logs nothing by itself. To log each call, register an event listener on the client
+(`onResponse()`, `onError()`; see the README's Middleware and events section) — the API key and
+the signature are masked in what they receive.
+
+### Webhooks rejected
+
+- A 419 means the route is in `routes/web.php` and CSRF verification rejected it: move it to
+  `routes/api.php` or exclude its path (README, Webhook Security).
+- `INVALID_SIGNATURE` usually means `PROOFAGE_SECRET_KEY` is not the workspace's **active** secret
+  key: webhooks are signed with the active one only, while API calls accept any of its keys.
+- `TIMESTAMP_TOO_OLD` means the server clock is more than `webhook_tolerance` seconds off.
 
 ## Support
 

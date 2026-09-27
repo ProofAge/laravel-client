@@ -54,8 +54,8 @@ When everything is configured correctly, you should see:
 ```
 ✅ Configuration is valid
 ✅ Workspace connection successful
-✅ Webhook URL is configured https://yoursite.com/webhooks/proof-age
-✅ Webhook route found: POST webhooks/proof-age -> App\Http\Controllers\WebhookController@handleProofAgeWebhook
+✅ Webhook URL is configured https://yoursite.com/api/webhooks/proofage
+✅ Webhook route found: POST api/webhooks/proofage -> App\Http\Controllers\ProofAgeWebhookController@handle
 ✅ Webhook route is protected with VerifyWebhookSignature middleware
 ✅ ProofAge setup verified successfully!
 ```
@@ -76,7 +76,7 @@ The verification command ensures:
 If you see errors about missing middleware, add it to your webhook route:
 
 ```php
-Route::post('/webhooks/proof-age', [WebhookController::class, 'handleProofAgeWebhook'])
+Route::post('/webhooks/proofage', [ProofAgeWebhookController::class, 'handle'])
     ->middleware('proofage.verify_webhook');
 ```
 
@@ -93,9 +93,18 @@ $workspace = ProofAge::workspace()->get();
 
 // Create a verification
 $verification = ProofAge::verifications()->create([
-    'callback_url' => 'https://your-app.com/webhook',
-    'metadata' => ['user_id' => 123]
+    // Where the person's browser is sent after the flow: a page of your app, not a webhook.
+    // Decisions are POSTed to the workspace's webhook URL, set in the ProofAge console
+    // (see Webhook Security below).
+    'callback_url' => 'https://your-app.com/verification/done',
+    // Your identifiers, echoed back in every response and webhook. `metadata` is also accepted,
+    // but it is stored internally and never returned, so it cannot be used for correlation.
+    'external_id' => (string) $user->id,
+    'external_metadata' => ['plan' => 'pro'],
 ]);
+
+// Send the person to the hosted verification flow at $verification['url'],
+// e.g. redirect()->away($verification['url']); the decision arrives by webhook.
 
 // Get verification details
 $verification = ProofAge::verifications()->find('verification-id');
@@ -115,22 +124,40 @@ $estimation = ProofAge::verifications('verification-id')->estimation();
 //         'confidence' => 0.93,
 //     ],
 // ]
+```
 
-// Accept consent for verification
+If you capture the images yourself instead of using the hosted flow:
+
+```php
+// Accept consent: the id and text_sha256 must be exactly those of the active consent version,
+// whose text (at $consent['url']) is what the person was shown. Anything else is rejected.
+$consent = ProofAge::workspace()->getConsent();
+
 ProofAge::verifications('verification-id')->acceptConsent([
-    'consent_version_id' => 1,
-    'text_sha256' => 'hash-value'
+    'consent_version_id' => $consent['id'],
+    'text_sha256' => $consent['text_sha256'],
 ]);
 
-// Upload media
+// Upload media: images only. `type` is selfie, liveness_selfie or document; a document also
+// needs `side` (front|back) and `document` (id|driver_license|passport|residence_permit).
 ProofAge::verifications('verification-id')->uploadMedia([
     'type' => 'selfie',
-    'file' => $uploadedFile
+    'file' => $request->file('selfie'),
 ]);
 
-// Submit verification
+ProofAge::verifications('verification-id')->uploadMedia([
+    'type' => 'document',
+    'side' => 'front',
+    'document' => 'passport',
+    'file' => $request->file('passport_front'),
+]);
+
+// Submit verification; the decision arrives by webhook
 ProofAge::verifications('verification-id')->submit();
 ```
+
+`uploadMedia()` and `submit()` return `null`: the API answers both with an empty `200`. A failure
+throws (see Error Handling).
 
 ### Using the Client Directly
 
@@ -187,34 +214,71 @@ are not covered.
 
 The package includes middleware to verify HMAC signatures on incoming webhook requests from ProofAge.
 
+A workspace has exactly one webhook URL, set in its settings in the ProofAge console, and ProofAge
+POSTs every decision to it: one route per workspace.
+
 ### Using the Middleware
 
-Apply the middleware to your webhook routes:
+Register the route in `routes/api.php`. Its routes carry no CSRF check — ProofAge's POST has no
+CSRF token — and are prefixed with `/api`, so the URL to enter in the console is
+`https://your-app.com/api/webhooks/proofage`. (No `routes/api.php` yet? `php artisan install:api`
+creates it.)
 
 ```php
-// In your routes/web.php or routes/api.php
-Route::post('/proofage/webhook', [WebhookController::class, 'handle'])
+// routes/api.php
+Route::post('/webhooks/proofage', [ProofAgeWebhookController::class, 'handle'])
     ->middleware('proofage.verify_webhook');
 ```
 
-Or apply it to a route group:
+In `routes/web.php` instead, exclude the path from CSRF verification in `bootstrap/app.php`, or
+every webhook is rejected with a 419 before the middleware runs:
 
 ```php
-Route::middleware(['proofage.verify_webhook'])->group(function () {
-    Route::post('/proofage/decision-webhook', [WebhookController::class, 'handleDecision']);
-    Route::post('/proofage/track-webhook', [WebhookController::class, 'handleStatusChanged']);
-});
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->validateCsrfTokens(except: ['webhooks/proofage']);
+})
 ```
+
+### The webhook body
+
+Sent when a verification's status becomes `approved`, `declined`, `resubmission_requested`,
+`review`, `abandoned` or `expired`:
+
+```json
+{
+    "verification_id": "019d...",
+    "status": "declined",
+    "external_id": "123",
+    "external_metadata": {"plan": "pro"},
+    "reason": "document.face.mismatch",
+    "timestamp": "2026-09-27T12:00:00+00:00"
+}
+```
+
+`reason` is set on `declined` and `resubmission_requested` only. `duplicate_detected`,
+`duplicate_count` and `duplicate_of` (`verification_id`, `external_id`) are added when the face
+matched another account, and `fingerprint_signals` and `manual_moderation` when they apply. Each
+delivery carries an `X-ProofAge-Webhook-Delivery-Id` header that stays the same across retries of
+that delivery: use it to process a delivery once. The repository's `examples/webhook-controller.php` handles each
+status; the SDK's `AGENTS.md` has the full body.
 
 ### How It Works
 
-The middleware:
+The middleware (`ProofAge\Laravel\Middleware\VerifyWebhookSignature`), in this order:
 
-1. Checks that `PROOFAGE_SECRET_KEY` is configured
-2. Verifies the `X-HMAC-Signature` header is present
-3. Generates the expected signature using the same algorithm as ProofAge
-4. Compares signatures using `hash_equals()` for timing-safe comparison
-5. Returns appropriate error responses for invalid requests
+1. Requires the `X-HMAC-Signature`, `X-Timestamp` and `X-Auth-Client` headers (401
+   `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`, `MISSING_AUTH_CLIENT`).
+2. Reads `api_key` and `secret_key` under its config prefix (`proofage` by default, or the one
+   named as `proofage.verify_webhook:{prefix}`); either missing is a 418 `CONFIGURATION_ERROR`.
+3. Checks that `X-Auth-Client` equals the configured `api_key` (401 `INVALID_AUTH_CLIENT`).
+4. Rejects an `X-Timestamp` more than `webhook_tolerance` seconds (default 300) from now (401
+   `TIMESTAMP_TOO_OLD`).
+5. Computes `hex(hmac_sha256(X-Timestamp . '.' . rawBody, secret_key))` and compares it with
+   `X-HMAC-Signature` using `hash_equals()`; if that fails, it retries once over the body
+   re-encoded as ProofAge encodes JSON, for a proxy that re-serialised it (401 `INVALID_SIGNATURE`).
+
+ProofAge signs webhooks with the workspace's **active** secret key only (API calls accept any of
+its keys), so `secret_key` must be the active one.
 
 ## Multiple Workspaces
 
@@ -257,19 +321,21 @@ use ProofAge\Laravel\ProofAgeClientFactory;
 
 // Buyer verification -- uses default proofage.* config
 $buyerVerification = ProofAge::verifications()->create([
-    'callback_url' => 'https://marketplace.com/webhooks/proofage',
+    'callback_url' => 'https://marketplace.com/buyer/verification/done', // browser return page
+    'external_id' => (string) $buyer->id,
 ]);
 
 // Seller verification -- uses services.proofage_seller config
 $sellerClient = app(ProofAgeClientFactory::class)->make('services.proofage_seller');
 $sellerVerification = $sellerClient->verifications()->create([
-    'callback_url' => 'https://marketplace.com/webhooks/proofage-seller',
+    'callback_url' => 'https://marketplace.com/seller/verification/done', // browser return page
+    'external_id' => (string) $seller->id,
 ]);
 ```
 
 #### 3. Set up separate webhook routes
 
-Each workspace sends webhooks signed with its own secret key. Use the middleware's config prefix parameter to verify signatures with the correct credentials:
+Each workspace sends webhooks to the webhook URL in its own console settings, signed with its own active secret key. Use the middleware's config prefix parameter to verify signatures with the correct credentials:
 
 ```php
 // routes/api.php
@@ -308,6 +374,7 @@ When a custom config prefix is used, the following resolution rules apply:
 | `timeout` | Specified prefix, falls back to `proofage.timeout` |
 | `retry_attempts` | Specified prefix, falls back to `proofage.retry_attempts` |
 | `retry_delay` | Specified prefix, falls back to `proofage.retry_delay` |
+| `download_retry_attempts` | Specified prefix, falls back to `proofage.download_retry_attempts` |
 | `webhook_tolerance` | Specified prefix, falls back to `proofage.webhook_tolerance` (default: 300s) |
 
 Additional workspaces only need `api_key` and `secret_key`. If a workspace connects to a different ProofAge environment (e.g. staging), add `base_url` under the same prefix and it will take priority over the default.
@@ -323,10 +390,13 @@ Additional workspaces only need `api_key` and `secret_key`. If a workspace conne
 
 - `verifications()->create(array $data)` - Create a new verification
 - `verifications()->find(string $id)` - Get verification by ID
+- `verifications(string $id)->get()` - Get the verification the resource was built for
 - `verifications(string $id)->acceptConsent(array $data)` - Accept consent
-- `verifications(string $id)->uploadMedia(array $data)` - Upload media files
-- `verifications(string $id)->submit()` - Submit verification for processing
+- `verifications(string $id)->uploadMedia(array $data)` - Upload a media file (returns `null`)
+- `verifications(string $id)->submit()` - Submit verification for processing (returns `null`)
 - `verifications(string $id)->document()` - Get sanitized document fields and source media
+- `verifications(string $id)->downloadMedia(string $mediaId)` - Download one media file as a PSR-7 stream
+- `verifications(string $id)->downloadMediaTo(string $mediaId, string $path)` - Download one media file straight to disk
 - `verifications(string $id)->estimation()` - Get age-threshold and gender estimation
 - `verifications(string $id)->blockFace(?array $data)` - Block the verification face for AML
 
@@ -339,6 +409,11 @@ and the bundled `vendor/proofage/php-sdk/resources/openapi.json`.
 `ProofAge\Sdk\Enums\VerificationStatus`, `ProofAge\Sdk\Enums\WebhookReason` and
 `ProofAge\Sdk\Enums\BlockFaceReasonCode` model the `status`, AML `reason` and `reason_code` values.
 (`ProofAge\Laravel\Enums\*` was removed in 0.7.0.)
+
+A verification's `status` can also be `documents_required`, taken from its latest attempt, which
+is not a `VerificationStatus` case: map `status` with `VerificationStatus::tryFrom()`, never
+`from()`, and handle `null`. `WebhookReason` covers only the AML blocklist codes; treat `reason` as
+an open string.
 
 ## Error Handling
 
@@ -391,9 +466,7 @@ The webhook middleware throws `ProofAge\Laravel\Exceptions\WebhookVerificationEx
 }
 ```
 
-To customize this response, register a renderable in your application's exception handler:
-
-**Laravel 11+ (`bootstrap/app.php`):**
+To customize this response, register a renderable in `bootstrap/app.php`:
 
 ```php
 use ProofAge\Laravel\Exceptions\WebhookVerificationException;
@@ -408,24 +481,6 @@ use ProofAge\Laravel\Exceptions\WebhookVerificationException;
         ], $e->statusCode);
     });
 })
-```
-
-**Laravel 10 (`app/Exceptions/Handler.php`):**
-
-```php
-use ProofAge\Laravel\Exceptions\WebhookVerificationException;
-
-public function register(): void
-{
-    $this->renderable(function (WebhookVerificationException $e) {
-        return response()->json([
-            'error' => [
-                'code' => $e->errorCode,
-                'message' => $e->getMessage(),
-            ],
-        ], $e->statusCode);
-    });
-}
 ```
 
 ## Testing
