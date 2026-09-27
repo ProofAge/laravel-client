@@ -2,7 +2,6 @@
 
 namespace ProofAge\Laravel\Tests;
 
-use Composer\InstalledVersions;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use ProofAge\Laravel\Http\IlluminateHttpClient;
@@ -146,16 +145,6 @@ class IlluminateHttpClientTest extends TestCase
         ]);
 
         [$expected, $signed] = $this->wireSignature();
-
-        // proofage/php-sdk up to 0.1.2 signs null as absent and false as "0", while every
-        // transport sends both as an empty part, so the server computes a different string.
-        // The fix belongs in the SDK's MultipartBody; this adapter forwards the fields as
-        // given. Remove this guard once composer.json requires the fixed SDK.
-        $installed = (string) InstalledVersions::getPrettyVersion('proofage/php-sdk');
-
-        if ($expected !== $signed && preg_match('/^v?0\.1\.[0-2]$/', $installed) === 1) {
-            $this->markTestSkipped("proofage/php-sdk {$installed} signs null/false multipart fields differently from how they are sent.");
-        }
 
         $this->assertSame($expected, $signed);
     }

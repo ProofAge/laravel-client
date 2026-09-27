@@ -118,9 +118,9 @@ class VerificationResourceTest extends TestCase
         $result = $client->verifications('ver_xyz')->get();
 
         $this->assertEquals('ver_xyz', $result['id']);
-        // Surfaced from the latest attempt; not a VerificationStatus case.
+        // Surfaced from the latest attempt rather than the verification itself.
         $this->assertSame('documents_required', $result['status']);
-        $this->assertNull(VerificationStatus::tryFrom($result['status']));
+        $this->assertSame(VerificationStatus::DOCUMENTS_REQUIRED, VerificationStatus::tryFrom($result['status']));
     }
 
     public function test_accept_consent_sends_post(): void

@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 - 2026-09-27
+
+Requires `proofage/php-sdk` ^0.2.0, which normalizes multipart fields so null and boolean values
+no longer break the upload signature, stops retrying a `POST` the server may already have acted
+on, reads every error body shape the API sends, knows the `documents_required` status and
+bundles an OpenAPI spec pointing at `api.proofage.xyz`. See its changelog for the full list.
 
 ### Fixed
 

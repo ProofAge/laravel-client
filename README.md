@@ -410,9 +410,10 @@ and the bundled `vendor/proofage/php-sdk/resources/openapi.json`.
 `ProofAge\Sdk\Enums\BlockFaceReasonCode` model the `status`, AML `reason` and `reason_code` values.
 (`ProofAge\Laravel\Enums\*` was removed in 0.7.0.)
 
-A verification's `status` can also be `documents_required`, taken from its latest attempt, which
-is not a `VerificationStatus` case: map `status` with `VerificationStatus::tryFrom()`, never
-`from()`, and handle `null`. `WebhookReason` covers only the AML blocklist codes; treat `reason` as
+A verification's `status` can also be `documents_required`, taken from its latest attempt
+(`VerificationStatus::DOCUMENTS_REQUIRED` since `proofage/php-sdk` 0.2.0). Map `status` with
+`VerificationStatus::tryFrom()` rather than `from()` and handle `null`, so a status added later
+does not throw. `WebhookReason` covers only the AML blocklist codes; treat `reason` as
 an open string.
 
 ## Error Handling

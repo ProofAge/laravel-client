@@ -22,7 +22,7 @@ in `data`. `uploadMedia()` and `submit()` return `null` (the API answers an empt
   `side` (`front`|`back`) and `document` (`id`|`driver_license`|`passport`|`residence_permit`).
   Images only. `document_front` / `document_back` are media types in `document()`'s output, not
   inputs.
-- `status` may be `documents_required`, which is not a `VerificationStatus` case: use `tryFrom()`.
+- `status` may be `documents_required` (`VerificationStatus::DOCUMENTS_REQUIRED`); map it with `tryFrom()` so a future status does not throw.
 - Webhooks: one URL per workspace, set in the ProofAge console, not per verification. One body
   shape (`verification_id`, `status`, `external_id`, `external_metadata`, `reason`, `timestamp`,
   plus `duplicate_*`, `fingerprint_signals`, `manual_moderation` when present) — there is no
