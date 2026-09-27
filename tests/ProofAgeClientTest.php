@@ -76,15 +76,15 @@ class ProofAgeClientTest extends TestCase
     public function test_it_can_create_verification(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/v1/verifications' => Http::response(['id' => 'ver_123', 'status' => 'pending']),
+            'api.test.com/v1/verifications' => Http::response(['id' => 'ver_123', 'status' => 'created'], 201),
         ]);
 
         $result = $client->verifications()->create([
-            'callback_url' => 'https://example.com/webhook',
+            'callback_url' => 'https://example.com/verification/done',
         ]);
 
         $this->assertEquals('ver_123', $result['id']);
-        $this->assertEquals('pending', $result['status']);
+        $this->assertEquals('created', $result['status']);
     }
 
     public function test_it_throws_authentication_exception_on_401(): void
@@ -122,7 +122,7 @@ class ProofAgeClientTest extends TestCase
         $client = $this->makeFakedClient([
             'api.test.com/v1/verifications' => Http::response(['id' => 'ver_123']),
         ]);
-        $data = ['callback_url' => 'https://example.com/webhook'];
+        $data = ['callback_url' => 'https://example.com/verification/done'];
         $rawBody = json_encode($data);
 
         $client->verifications()->create($data);
@@ -140,26 +140,30 @@ class ProofAgeClientTest extends TestCase
     public function test_it_can_accept_consent_for_verification(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/v1/verifications/ver_123/consent' => Http::response(['accepted' => true]),
+            'api.test.com/v1/verifications/ver_123/consent' => Http::response([
+                'consent_version_id' => 1,
+                'consent_accepted_at' => '2026-09-27T12:01:00+00:00',
+            ]),
         ]);
 
         $result = $client->verifications('ver_123')->acceptConsent([
             'consent_version_id' => 1,
-            'text_sha256' => 'abc123',
+            'text_sha256' => hash('sha256', 'consent text'),
         ]);
 
-        $this->assertTrue($result['accepted']);
+        $this->assertSame(1, $result['consent_version_id']);
+        $this->assertSame('2026-09-27T12:01:00+00:00', $result['consent_accepted_at']);
     }
 
     public function test_it_can_submit_verification(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/v1/verifications/ver_123/submit' => Http::response(['id' => 'ver_123', 'status' => 'processing']),
+            'api.test.com/v1/verifications/ver_123/submit' => Http::response('', 200),
         ]);
 
         $result = $client->verifications('ver_123')->submit();
 
-        $this->assertEquals('processing', $result['status']);
+        $this->assertNull($result, 'Submit answers 200 with an empty body.');
     }
 
     public function test_from_response_returns_correct_subclass_for_authentication(): void

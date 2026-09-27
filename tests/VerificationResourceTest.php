@@ -8,9 +8,33 @@ use Illuminate\Support\Facades\Http;
 use ProofAge\Laravel\Exceptions\ProofAgeException;
 use ProofAge\Laravel\ProofAgeClient;
 use ProofAge\Laravel\Resources\VerificationResource;
+use ProofAge\Sdk\Enums\VerificationStatus;
 
 class VerificationResourceTest extends TestCase
 {
+    /**
+     * A verification as GET /v1/verifications/{id} returns it; create adds `url`.
+     *
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function verificationBody(string $id, array $overrides = []): array
+    {
+        return $overrides + [
+            'id' => $id,
+            'external_id' => 'user-42',
+            'external_metadata' => ['plan' => 'pro'],
+            'redirect_url' => 'https://example.com/verification/done',
+            'status' => 'created',
+            'reason' => null,
+            'duplicate_check' => ['checked' => false, 'duplicate_count' => 0, 'duplicates' => []],
+            'erasure' => null,
+            'consent_accepted_at' => null,
+            'created_at' => '2026-09-27T12:00:00+00:00',
+            'updated_at' => '2026-09-27T12:00:00+00:00',
+        ];
+    }
+
     private function makeFakedClient(array $fakeResponses): ProofAgeClient
     {
         Http::fake($fakeResponses);
@@ -26,23 +50,27 @@ class VerificationResourceTest extends TestCase
     public function test_create_sends_post_with_data(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/v1/verifications' => Http::response([
-                'id' => 'ver_new',
-                'status' => 'pending',
-            ]),
+            'api.test.com/v1/verifications' => Http::response($this->verificationBody('ver_new', [
+                'url' => 'https://idv.proofage.xyz/v/eyJ...',
+            ]), 201),
         ]);
 
         $result = $client->verifications()->create([
-            'callback_url' => 'https://example.com/callback',
-            'metadata' => ['user_id' => 42],
+            'callback_url' => 'https://example.com/verification/done',
+            'external_id' => 'user-42',
+            'external_metadata' => ['plan' => 'pro'],
         ]);
 
         $this->assertEquals('ver_new', $result['id']);
-        $this->assertEquals('pending', $result['status']);
+        $this->assertEquals('created', $result['status']);
+        $this->assertSame('https://example.com/verification/done', $result['redirect_url']);
+        $this->assertSame('user-42', $result['external_id']);
+        $this->assertSame('https://idv.proofage.xyz/v/eyJ...', $result['url']);
 
         Http::assertSent(function ($request) {
             return $request->method() === 'POST'
                 && str_contains($request->url(), '/v1/verifications')
+                && $request['external_id'] === 'user-42'
                 && $request->hasHeader('X-HMAC-Signature');
         });
     }
@@ -50,10 +78,10 @@ class VerificationResourceTest extends TestCase
     public function test_find_sends_get_to_correct_endpoint(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/v1/verifications/ver_abc' => Http::response([
-                'id' => 'ver_abc',
+            'api.test.com/v1/verifications/ver_abc' => Http::response($this->verificationBody('ver_abc', [
                 'status' => 'approved',
-            ]),
+                'consent_accepted_at' => '2026-09-27T12:01:00+00:00',
+            ])),
         ]);
 
         $result = $client->verifications()->find('ver_abc');
@@ -82,33 +110,49 @@ class VerificationResourceTest extends TestCase
     public function test_get_fetches_by_constructor_id(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/v1/verifications/ver_xyz' => Http::response([
-                'id' => 'ver_xyz',
-                'status' => 'pending',
-            ]),
+            'api.test.com/v1/verifications/ver_xyz' => Http::response($this->verificationBody('ver_xyz', [
+                'status' => 'documents_required',
+            ])),
         ]);
 
         $result = $client->verifications('ver_xyz')->get();
 
         $this->assertEquals('ver_xyz', $result['id']);
+        // Surfaced from the latest attempt; not a VerificationStatus case.
+        $this->assertSame('documents_required', $result['status']);
+        $this->assertNull(VerificationStatus::tryFrom($result['status']));
     }
 
     public function test_accept_consent_sends_post(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/v1/verifications/ver_123/consent' => Http::response(['accepted' => true]),
+            'api.test.com/v1/consent' => Http::response([
+                'id' => 3,
+                'version' => '2026-09-01',
+                'text_sha256' => $sha = hash('sha256', 'consent text'),
+                'url' => 'https://proofage.xyz/consent/2026-09-01',
+            ]),
+            'api.test.com/v1/verifications/ver_123/consent' => Http::response([
+                'consent_version_id' => 3,
+                'consent_accepted_at' => '2026-09-27T12:01:00+00:00',
+            ]),
         ]);
+
+        $consent = $client->workspace()->getConsent();
 
         $result = $client->verifications('ver_123')->acceptConsent([
-            'consent_version_id' => 1,
-            'text_sha256' => 'hash',
+            'consent_version_id' => $consent['id'],
+            'text_sha256' => $consent['text_sha256'],
         ]);
 
-        $this->assertTrue($result['accepted']);
+        $this->assertSame(3, $result['consent_version_id']);
+        $this->assertSame('2026-09-27T12:01:00+00:00', $result['consent_accepted_at']);
 
-        Http::assertSent(function ($request) {
+        Http::assertSent(function ($request) use ($sha) {
             return $request->method() === 'POST'
-                && str_contains($request->url(), '/v1/verifications/ver_123/consent');
+                && str_contains($request->url(), '/v1/verifications/ver_123/consent')
+                && $request['consent_version_id'] === 3
+                && $request['text_sha256'] === $sha;
         });
     }
 
@@ -126,22 +170,47 @@ class VerificationResourceTest extends TestCase
     public function test_upload_media_sends_multipart_request(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/*' => Http::response(['id' => 'media_456']),
+            'api.test.com/*' => Http::response('', 200),
         ]);
 
         $file = UploadedFile::fake()->image('doc.jpg', 800, 600);
 
         $result = $client->verifications('ver_123')->uploadMedia([
-            'type' => 'document_front',
+            'type' => 'document',
+            'side' => 'front',
+            'document' => 'passport',
             'file' => $file,
         ]);
 
-        $this->assertEquals('media_456', $result['id']);
+        $this->assertNull($result);
 
-        Http::assertSent(function ($request) {
+        $field = fn ($request, string $name, string $value): bool => collect($request->data())
+            ->contains(fn (array $part) => $part['name'] === $name && $part['contents'] === $value);
+
+        Http::assertSent(function ($request) use ($field) {
             return str_contains($request->url(), '/v1/verifications/ver_123/media')
+                && $request->hasFile('file', null, 'doc.jpg')
+                && $field($request, 'type', 'document')
+                && $field($request, 'side', 'front')
+                && $field($request, 'document', 'passport')
                 && $request->hasHeader('X-HMAC-Signature');
         });
+    }
+
+    public function test_upload_media_and_submit_return_null_for_the_empty_200_the_api_answers(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_123/media' => Http::response('', 200),
+            'api.test.com/v1/verifications/ver_123/submit' => Http::response('', 200),
+        ]);
+
+        $this->assertNull($client->verifications('ver_123')->uploadMedia([
+            'type' => 'selfie',
+            'file' => UploadedFile::fake()->image('selfie.jpg'),
+        ]));
+        $this->assertNull($client->verifications('ver_123')->submit());
+
+        Http::assertSentCount(2);
     }
 
     public function test_upload_media_throws_when_no_id(): void
@@ -158,15 +227,12 @@ class VerificationResourceTest extends TestCase
     public function test_submit_sends_post(): void
     {
         $client = $this->makeFakedClient([
-            'api.test.com/v1/verifications/ver_123/submit' => Http::response([
-                'id' => 'ver_123',
-                'status' => 'processing',
-            ]),
+            'api.test.com/v1/verifications/ver_123/submit' => Http::response('', 200),
         ]);
 
         $result = $client->verifications('ver_123')->submit();
 
-        $this->assertEquals('processing', $result['status']);
+        $this->assertNull($result);
 
         Http::assertSent(function ($request) {
             return $request->method() === 'POST'
@@ -201,14 +267,16 @@ class VerificationResourceTest extends TestCase
                     [
                         'id' => 'media_selfie',
                         'type' => 'selfie',
-                        'signed_url' => 'https://storage.test/selfie.jpg',
-                        'expires_at' => '2026-05-18T13:00:00+00:00',
+                        'url' => 'https://api.test.com/v1/verifications/ver_123/media/media_selfie',
+                    ],
+                    [
+                        'id' => 'media_front',
+                        'type' => 'document_front',
+                        'url' => null,
                     ],
                 ],
                 'meta' => [
                     'attempt_id' => 'attempt_123',
-                    'signed_url_ttl_seconds' => 3600,
-                    'signed_url_expires_at' => '2026-05-18T13:00:00+00:00',
                 ],
             ]),
         ]);
@@ -217,7 +285,9 @@ class VerificationResourceTest extends TestCase
 
         $this->assertSame('John', $result['document']['fields']['first_name']);
         $this->assertSame('AB123456', $result['document']['fields']['document_number']);
-        $this->assertSame(3600, $result['meta']['signed_url_ttl_seconds']);
+        $this->assertSame('media_selfie', $result['media'][0]['id']);
+        $this->assertNull($result['media'][1]['url'], 'A purged or expired media has no url.');
+        $this->assertSame('attempt_123', $result['meta']['attempt_id']);
 
         Http::assertSent(function ($request) {
             return $request->method() === 'GET'
