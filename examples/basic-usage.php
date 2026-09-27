@@ -31,7 +31,8 @@ try {
     $workspace = $client->workspace()->get();
     echo 'Workspace: '.$workspace['name'].' (Mode: '.$workspace['mode'].")\n\n";
 
-    // Get consent information
+    // Get the active consent version. Its text (at $consent['url']) is what the person must be
+    // shown, and its id and text_sha256 are the only values acceptConsent() takes.
     echo "Getting consent information...\n";
     $consent = $client->workspace()->getConsent();
     echo 'Consent version: '.$consent['version']."\n\n";
@@ -39,32 +40,52 @@ try {
     // Create a verification
     echo "Creating verification...\n";
     $verification = $client->verifications()->create([
-        'callback_url' => 'https://your-app.com/webhook',
-        'metadata' => [
-            'user_id' => 123,
-            'session_id' => 'abc123',
-        ],
+        // Where the person's browser goes after finishing the flow — a page of your app, not a
+        // webhook. Decisions are POSTed to the webhook URL set in the workspace settings of the
+        // ProofAge console.
+        'callback_url' => 'https://your-app.com/verification/done',
+        // Your identifiers, echoed back in responses and webhooks. (`metadata` is stored but
+        // never returned, so it cannot be used to find the user again.)
+        'external_id' => 'user-123',
+        'external_metadata' => ['session_id' => 'abc123'],
     ]);
-    echo 'Created verification: '.$verification['id']."\n\n";
+    echo 'Created verification: '.$verification['id']."\n";
+    // Most integrations stop here and send the person to the hosted flow:
+    echo 'Hosted flow: '.$verification['url']."\n\n";
 
     $verificationId = $verification['id'];
 
-    // Accept consent for the verification
+    // The rest is for an integration that captures the images itself.
+
+    // Accept consent for the verification, once the person has accepted the text
     echo "Accepting consent...\n";
     $consentResult = $client->verifications($verificationId)->acceptConsent([
         'consent_version_id' => $consent['id'],
-        'text_sha256' => hash('sha256', 'consent text here'),
+        'text_sha256' => $consent['text_sha256'],
     ]);
     echo 'Consent accepted at: '.$consentResult['consent_accepted_at']."\n\n";
 
-    // Upload a selfie (example with file path; a path that does not exist throws \InvalidArgumentException)
+    // Upload a selfie and the front of a passport. Images only. Both calls return null — the
+    // API answers 200 with an empty body — and throw on failure. A path that does not exist
+    // throws \InvalidArgumentException before anything is sent.
     if (file_exists('/path/to/selfie.jpg')) {
         echo "Uploading selfie...\n";
-        $mediaResult = $client->verifications($verificationId)->uploadMedia([
+        $client->verifications($verificationId)->uploadMedia([
             'type' => 'selfie',
             'file' => '/path/to/selfie.jpg',
         ]);
-        echo 'Media uploaded: '.$mediaResult['message']."\n\n";
+        echo "Selfie uploaded\n\n";
+    }
+
+    if (file_exists('/path/to/passport.jpg')) {
+        echo "Uploading document...\n";
+        $client->verifications($verificationId)->uploadMedia([
+            'type' => 'document',
+            'side' => 'front',                      // front | back
+            'document' => 'passport',               // id | driver_license | passport | residence_permit
+            'file' => '/path/to/passport.jpg',
+        ]);
+        echo "Document uploaded\n\n";
     }
 
     // Get verification status
@@ -72,9 +93,9 @@ try {
     $verificationStatus = $client->verifications($verificationId)->get();
     echo 'Verification status: '.$verificationStatus['status']."\n\n";
 
-    // Submit verification for processing
+    // Submit verification for processing (null on success; the decision arrives by webhook)
     echo "Submitting verification...\n";
-    $submitResult = $client->verifications($verificationId)->submit();
+    $client->verifications($verificationId)->submit();
     echo "Verification submitted successfully\n";
 
 } catch (AuthenticationException $e) {

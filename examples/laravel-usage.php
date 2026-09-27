@@ -1,6 +1,11 @@
 <?php
 
 // Example Laravel Controller using the ProofAge client
+//
+// Most integrations only need startVerification(): send the person to the hosted flow at
+// $verification['url'] and learn the outcome from the webhook (see webhook-controller.php).
+// The consent/upload/submit actions below are for an integration that captures the images
+// itself instead of using the hosted flow.
 
 namespace App\Http\Controllers;
 
@@ -22,21 +27,24 @@ class VerificationController extends Controller
      */
     public function startVerification(Request $request): JsonResponse
     {
-        $request->validate([
-            'callback_url' => 'required|url',
-            'metadata' => 'array',
-        ]);
-
         try {
-            // Create verification using the facade
             $verification = ProofAge::verifications()->create([
-                'callback_url' => $request->input('callback_url'),
-                'metadata' => $request->input('metadata', []),
+                // Where the person's browser is sent when they finish the flow — a page of
+                // your app, not a webhook. The outcome arrives separately, at the webhook URL
+                // configured in the workspace settings of the ProofAge console.
+                'callback_url' => route('verification.done'),
+                // Your own identifiers, echoed back in every verification response and in
+                // every webhook, so the webhook can find the user. (`metadata` is stored by
+                // ProofAge but never returned: do not use it for correlation.)
+                'external_id' => (string) $request->user()->id,
+                'external_metadata' => ['plan' => 'pro'],
             ]);
 
             return response()->json([
                 'success' => true,
-                'verification' => $verification,
+                'verification_id' => $verification['id'],
+                // Redirect the person here to run the hosted verification flow.
+                'url' => $verification['url'],
             ]);
 
         } catch (ValidationException $e) {
@@ -62,24 +70,29 @@ class VerificationController extends Controller
     }
 
     /**
-     * Accept consent for a verification.
+     * Record that the person accepted the consent text you showed them.
+     *
+     * The consent version and its hash are not yours to choose: they must be exactly the
+     * `id` and `text_sha256` of the active version returned by GET /v1/consent, whose text
+     * (at its `url`) is what the person has to be shown. Any other value is rejected.
      */
     public function acceptConsent(Request $request, string $verificationId): JsonResponse
     {
         $request->validate([
-            'consent_version_id' => 'required|integer',
-            'text_sha256' => 'required|string',
+            'consent' => 'accepted',
         ]);
 
         try {
+            $consent = ProofAge::workspace()->getConsent();
+
             $result = ProofAge::verifications($verificationId)->acceptConsent([
-                'consent_version_id' => $request->input('consent_version_id'),
-                'text_sha256' => $request->input('text_sha256'),
+                'consent_version_id' => $consent['id'],
+                'text_sha256' => $consent['text_sha256'],
             ]);
 
             return response()->json([
                 'success' => true,
-                'consent' => $result,
+                'consent_accepted_at' => $result['consent_accepted_at'],
             ]);
 
         } catch (ProofAgeException $e) {
@@ -91,25 +104,29 @@ class VerificationController extends Controller
     }
 
     /**
-     * Upload media for verification.
+     * Upload a selfie or one side of an identity document.
      */
     public function uploadMedia(Request $request, string $verificationId): JsonResponse
     {
+        // The same rules the API applies: images only, up to 10 MB; a document needs the
+        // side and the document kind.
         $request->validate([
-            'type' => 'required|in:selfie,document_front,document_back',
-            'file' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240', // 10MB max
+            'type' => 'required|in:selfie,document',
+            'side' => 'required_if:type,document|in:front,back',
+            'document' => 'required_if:type,document|in:id,driver_license,passport,residence_permit',
+            'file' => 'required|image|max:10240',
         ]);
 
         try {
-            $result = ProofAge::verifications($verificationId)->uploadMedia([
+            // The API answers 200 with an empty body, so this returns null; failures throw.
+            ProofAge::verifications($verificationId)->uploadMedia(array_filter([
                 'type' => $request->input('type'),
+                'side' => $request->input('side'),
+                'document' => $request->input('document'),
                 'file' => $request->file('file'),
-            ]);
+            ], fn ($value) => $value !== null));
 
-            return response()->json([
-                'success' => true,
-                'media' => $result,
-            ]);
+            return response()->json(['success' => true]);
 
         } catch (ProofAgeException $e) {
             return response()->json([
@@ -129,7 +146,10 @@ class VerificationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'verification' => $verification,
+                // One of the ProofAge\Sdk\Enums\VerificationStatus values, or
+                // `documents_required`, which is not one of its cases: map it with tryFrom().
+                'status' => $verification['status'],
+                'reason' => $verification['reason'],
             ]);
 
         } catch (ProofAgeException $e) {
@@ -146,12 +166,10 @@ class VerificationController extends Controller
     public function submitVerification(string $verificationId): JsonResponse
     {
         try {
-            $result = ProofAge::verifications($verificationId)->submit();
+            // Empty 200 from the API, so null here; the decision arrives by webhook.
+            ProofAge::verifications($verificationId)->submit();
 
-            return response()->json([
-                'success' => true,
-                'result' => $result,
-            ]);
+            return response()->json(['success' => true]);
 
         } catch (ProofAgeException $e) {
             return response()->json([

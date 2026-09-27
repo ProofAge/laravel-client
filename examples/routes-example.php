@@ -5,27 +5,40 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| ProofAge Webhook Routes
+| ProofAge Webhook Route (routes/api.php)
 |--------------------------------------------------------------------------
 |
-| These routes handle incoming webhooks from ProofAge. The 'proofage.verify_webhook'
-| middleware ensures that all requests are properly signed with HMAC.
+| A workspace sends every webhook to one URL — the webhook URL in its settings in the
+| ProofAge console — so one route per workspace is all there is to register. The
+| 'proofage.verify_webhook' middleware rejects any request not signed with the
+| workspace's keys.
+|
+| routes/api.php is the simplest home: its routes carry no CSRF check, which ProofAge's
+| POST could never pass. They are prefixed with /api, so this route answers at
+| https://your-app.com/api/webhooks/proofage — the URL to enter in the console.
+| (No routes/api.php yet? `php artisan install:api` creates and registers it.)
 |
 */
 
-// Single webhook route with middleware
-Route::post('/proofage/webhook', [ProofAgeWebhookController::class, 'handle'])
+Route::post('/webhooks/proofage', [ProofAgeWebhookController::class, 'handle'])
     ->middleware('proofage.verify_webhook')
     ->name('proofage.webhook');
 
-// Multiple webhook routes with middleware group
-Route::middleware(['proofage.verify_webhook'])->prefix('proofage')->name('proofage.')->group(function () {
-    Route::post('/webhook', [ProofAgeWebhookController::class, 'handle'])->name('webhook');
-    Route::post('/status', [ProofAgeWebhookController::class, 'status'])->name('status');
-    Route::post('/notification', [ProofAgeWebhookController::class, 'notification'])->name('notification');
-});
-
-// API routes (if using api.php)
-Route::middleware(['api', 'proofage.verify_webhook'])->prefix('api/proofage')->group(function () {
-    Route::post('/webhook', [ProofAgeWebhookController::class, 'handle']);
-});
+/*
+| A second workspace (for example, sellers verified with their own keys) has its own URL
+| and names the config prefix its keys live under:
+|
+| Route::post('/webhooks/proofage-seller', [SellerWebhookController::class, 'handle'])
+|     ->middleware('proofage.verify_webhook:services.proofage_seller');
+|
+|--------------------------------------------------------------------------
+| In routes/web.php instead
+|--------------------------------------------------------------------------
+|
+| Web routes verify a CSRF token, so exclude the webhook path in bootstrap/app.php:
+|
+| ->withMiddleware(function (Middleware $middleware) {
+|     $middleware->validateCsrfTokens(except: ['webhooks/proofage']);
+| })
+|
+*/
