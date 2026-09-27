@@ -2,9 +2,11 @@
 
 namespace ProofAge\Laravel\Tests;
 
+use Composer\InstalledVersions;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use ProofAge\Laravel\Http\IlluminateHttpClient;
+use ProofAge\Laravel\ProofAgeClient;
 use ProofAge\Sdk\Exceptions\ProofAgeException;
 use ProofAge\Sdk\Exceptions\TransportException;
 use ProofAge\Sdk\Http\Body\FilePart;
@@ -14,6 +16,7 @@ use ProofAge\Sdk\Http\HttpClient;
 use ProofAge\Sdk\Http\Request;
 use ProofAge\Sdk\Http\Response;
 use ProofAge\Sdk\Http\RetryPolicy;
+use ProofAge\Sdk\Signing\Signer;
 use Psr\Http\Message\StreamInterface;
 
 /*
@@ -84,6 +87,77 @@ class IlluminateHttpClientTest extends TestCase
             && $request->hasFile('file', 'not-really-a-jpeg', 'front.jpg')
             && $field($request, 'type', 'document')
             && $field($request, 'side', 'front'));
+    }
+
+    public function test_a_file_part_content_type_reaches_the_wire(): void
+    {
+        Http::fake(['api.test.com/*' => Http::response('', 200)]);
+
+        (new IlluminateHttpClient)->send($this->request(
+            'POST',
+            body: new MultipartBody(
+                ['type' => 'selfie'],
+                [new FilePart('file', 'capture', 'bytes', 'image/heic')],
+            ),
+        ));
+
+        // Without the part's own type Guzzle would guess from the filename, and a name
+        // with no extension guesses nothing useful.
+        $this->assertContains('Content-Type: image/heic', $this->filePartHeaders('capture'));
+    }
+
+    public function test_a_file_part_without_a_content_type_keeps_the_guessed_one(): void
+    {
+        Http::fake(['api.test.com/*' => Http::response('', 200)]);
+
+        (new IlluminateHttpClient)->send($this->request(
+            'POST',
+            body: new MultipartBody(['type' => 'selfie'], [new FilePart('file', 'selfie.jpg', 'bytes')]),
+        ));
+
+        $this->assertContains('Content-Type: image/jpeg', $this->filePartHeaders('selfie.jpg'));
+    }
+
+    public function test_the_multipart_signature_covers_the_fields_as_they_go_on_the_wire(): void
+    {
+        Http::fake(['api.test.com/*' => Http::response('', 200)]);
+
+        $this->client()->verifications('ver_1')->uploadMedia([
+            'type' => 'document',
+            'side' => 'front',
+            'document' => 'passport',
+            'head_turn_step' => 3,
+            'nested' => ['b' => 'two', 'a' => 'one'],
+            'file' => new FilePart('file', 'front.jpg', 'jpeg-bytes'),
+        ]);
+
+        $this->assertWireFieldsVerify();
+    }
+
+    public function test_a_null_or_false_field_does_not_break_the_multipart_signature(): void
+    {
+        Http::fake(['api.test.com/*' => Http::response('', 200)]);
+
+        $this->client()->verifications('ver_1')->uploadMedia([
+            'type' => 'selfie',
+            'fingerprint' => null,
+            'flag' => false,
+            'file' => new FilePart('file', 'selfie.jpg', 'jpeg-bytes'),
+        ]);
+
+        [$expected, $signed] = $this->wireSignature();
+
+        // proofage/php-sdk up to 0.1.2 signs null as absent and false as "0", while every
+        // transport sends both as an empty part, so the server computes a different string.
+        // The fix belongs in the SDK's MultipartBody; this adapter forwards the fields as
+        // given. Remove this guard once composer.json requires the fixed SDK.
+        $installed = (string) InstalledVersions::getPrettyVersion('proofage/php-sdk');
+
+        if ($expected !== $signed && preg_match('/^v?0\.1\.[0-2]$/', $installed) === 1) {
+            $this->markTestSkipped("proofage/php-sdk {$installed} signs null/false multipart fields differently from how they are sent.");
+        }
+
+        $this->assertSame($expected, $signed);
     }
 
     public function test_a_connection_exception_becomes_a_transport_exception(): void
@@ -201,6 +275,85 @@ class IlluminateHttpClientTest extends TestCase
 
         $this->assertSame(['late' => true], $response->json());
         Http::assertSentCount(1);
+    }
+
+    /**
+     * The header lines of the file part named $filename in the one recorded request.
+     *
+     * @return list<string>
+     */
+    private function filePartHeaders(string $filename): array
+    {
+        $body = Http::recorded()->first()[0]->body();
+
+        foreach (explode("\r\n--", $body) as $chunk) {
+            [$head] = explode("\r\n\r\n", $chunk, 2);
+
+            if (str_contains($head, 'filename="'.$filename.'"')) {
+                return explode("\r\n", $head);
+            }
+        }
+
+        $this->fail("No file part named {$filename} was sent.");
+    }
+
+    private function client(): ProofAgeClient
+    {
+        return new ProofAgeClient([
+            'api_key' => 'test-api-key',
+            'secret_key' => 'test-secret-key',
+            'base_url' => 'https://api.test.com',
+            'version' => 'v1',
+        ]);
+    }
+
+    private function assertWireFieldsVerify(): void
+    {
+        [$expected, $signed] = $this->wireSignature();
+
+        $this->assertSame($expected, $signed, 'The server recomputes the signature from the fields it receives; they must be the fields that were signed.');
+    }
+
+    /**
+     * What the server would compute for the one recorded multipart request — its fields
+     * decoded the way PHP registers $_POST, its files hashed — beside the signature sent.
+     *
+     * @return array{string, string}
+     */
+    private function wireSignature(): array
+    {
+        $recorded = Http::recorded();
+        $this->assertCount(1, $recorded);
+
+        $request = $recorded->first()[0];
+        $this->assertTrue($request->isMultipart());
+        $this->assertSame(1, preg_match('/boundary=([^;]+)/', $request->header('Content-Type')[0], $m));
+
+        $pairs = [];
+        $hashes = [];
+
+        foreach (explode('--'.$m[1], $request->body()) as $chunk) {
+            if (! str_contains($chunk, "\r\n\r\n")) {
+                continue;
+            }
+
+            [$head, $contents] = explode("\r\n\r\n", $chunk, 2);
+            $contents = substr($contents, 0, -2);
+            preg_match('/name="([^"]*)"/', $head, $name);
+
+            if (str_contains($head, 'filename=')) {
+                $hashes[] = hash('sha256', $contents);
+            } else {
+                $pairs[] = rawurlencode($name[1]).'='.rawurlencode($contents);
+            }
+        }
+
+        parse_str(implode('&', $pairs), $fields);
+
+        $path = (string) parse_url($request->url(), PHP_URL_PATH);
+        $expected = hash_hmac('sha256', Signer::canonicalMultipart('POST', $path, $fields, $hashes), 'test-secret-key');
+
+        return [$expected, $request->header('X-HMAC-Signature')[0]];
     }
 
     /**

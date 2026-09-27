@@ -52,12 +52,29 @@ final class IlluminateHttpClient implements HttpClient
         if ($body instanceof MultipartBody) {
             // attach() rather than a pre-encoded body, so Http::fake() request inspection
             // ($request->hasFile('file'), $request['type']) keeps working. The multipart
-            // signature covers the fields and the file hashes, never the encoded body.
+            // signature covers the fields and the file hashes, never the encoded body, so
+            // the fields go out exactly as the SDK signed them: no value is added, dropped
+            // or rewritten here. Normalising them (skipping null, rendering booleans) is the
+            // SDK's MultipartBody's job, for every transport at once.
             foreach ($body->files as $part) {
-                $pending = $pending->attach($part->name, $part->contents, $part->filename);
+                $pending = $pending->attach(
+                    $part->name,
+                    $part->contents,
+                    $part->filename,
+                    $part->contentType !== null ? ['Content-Type' => $part->contentType] : [],
+                );
             }
 
-            return $pending->asMultipart()->send($request->method, $request->url, ['multipart' => $body->fields]);
+            // Each field pre-shaped as a {name, contents} part: Illuminate treats any array
+            // value holding those two keys as an already-built part, so handing it the raw
+            // field map would let a nested value that happens to have them be misread.
+            $fields = [];
+
+            foreach ($body->fields as $name => $value) {
+                $fields[] = ['name' => (string) $name, 'contents' => $value];
+            }
+
+            return $pending->asMultipart()->send($request->method, $request->url, ['multipart' => $fields]);
         }
 
         if ($body instanceof RawBody) {
