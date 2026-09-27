@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `IlluminateHttpClient` sends a `FilePart`'s `contentType` as the part's `Content-Type`; it was
+  dropped, so Guzzle guessed the type from the filename. Multipart fields are passed to Illuminate
+  as pre-built parts, exactly as the SDK signed them, so a nested field value holding `name` and
+  `contents` keys can no longer be mistaken for a part.
+- The documentation and examples described an API that does not exist. They now match it:
+  - `callback_url` is the page the person's browser returns to, not a webhook URL; webhooks go to
+    the one URL set in the workspace's console settings.
+  - Correlation uses `external_id` / `external_metadata`, which are echoed back; `metadata` is
+    never returned.
+  - `acceptConsent()` takes the `id` and `text_sha256` from `workspace()->getConsent()`.
+  - `uploadMedia()` takes `type` `selfie`|`liveness_selfie`|`document`, with `side` and
+    `document` for a document, images only; `document_front` / `document_back` are not inputs.
+  - `uploadMedia()` and `submit()` return `null` (the API answers an empty `200`).
+  - The webhook example handles the real body (`status`, `external_id`, `reason`,
+    `duplicate_detected`, …, no `event_type`) and dedupes on `X-ProofAge-Webhook-Delivery-Id`;
+    the routes example registers one webhook route, in `routes/api.php`, instead of invented
+    decision/track/status/notification routes, and shows the CSRF exclusion `routes/web.php` needs.
+  - The README's "How It Works" lists the middleware's real checks (the three headers, the
+    `X-Auth-Client` match, `webhook_tolerance`, HMAC over `timestamp.rawBody`) and notes that
+    webhooks are signed with the workspace's active secret key only.
+  - `download_retry_attempts` and `webhook_tolerance` are documented; the claim that
+    `LOG_LEVEL=debug` shows HTTP traffic (the package logs nothing) and the Laravel 10 exception
+    handler section (the package requires Laravel 12 or 13) are gone.
+  - `status` can be `documents_required`, which is not a `VerificationStatus` case: map it with
+    `tryFrom()`.
+- The facade's docblock lists every method it proxies, and the README lists `get()`,
+  `downloadMedia()` and `downloadMediaTo()`.
+
 ## 0.7.0 - 2026-09-03
 
 The package is now a Laravel integration layer over [`proofage/php-sdk`](https://github.com/ProofAge/php-sdk):
