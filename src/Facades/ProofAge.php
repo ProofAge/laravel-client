@@ -32,6 +32,14 @@ use ProofAge\Sdk\Http\Response;
 class ProofAge extends Facade
 {
     /**
+     * This package's version, reported as `laravel/{VERSION}` in X-ProofAge-Sdk and
+     * `ProofAge-Laravel/{VERSION}` in User-Agent. Equal to the newest released heading in
+     * CHANGELOG.md (tests/VersionTest.php); bumped in the release commit. The SDK's own is
+     * ProofAge\Sdk\Client::VERSION.
+     */
+    public const VERSION = '0.8.0';
+
+    /**
      * Get the registered name of the component.
      */
     protected static function getFacadeAccessor(): string

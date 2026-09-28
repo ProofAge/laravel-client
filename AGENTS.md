@@ -43,6 +43,9 @@ in `data`. `uploadMedia()` and `submit()` return `null` (the API answers an empt
   intercepts; no retry or throw of its own) and exceptions default to
   `ProofAge\Laravel\Exceptions\LaravelExceptionFactory`. `makeRequest()` / `makeStreamedRequest()`
   return `ProofAge\Sdk\Http\Response`.
+- **SDK identification**: every request sends `X-ProofAge-Sdk: laravel/{ProofAge::VERSION} php/{SDK version}`
+  and, unless a middleware sets one, `User-Agent: ProofAge-Laravel/{v} ProofAge-PHP/{v} (PHP {PHP_VERSION})`;
+  a wrapper passes `sdk_tokens` / `user_agent_prefix` to `new ProofAgeClient($config)` to go first.
 - **Multiple workspaces**: `app(ProofAgeClientFactory::class)->make('services.proofage_seller')`
   reads `api_key`/`secret_key` under that prefix; `base_url`, `version`, `timeout`,
   `retry_attempts`, `retry_delay`, `download_retry_attempts`, `webhook_tolerance` fall back to

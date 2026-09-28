@@ -200,6 +200,15 @@ $client->onResponse(fn (ResponseEvent $e) => Log::info('proofage.response', [
 
 See the SDK's README for the full middleware and event API and for what `raw()` on an event exposes.
 
+### SDK identification
+
+Every request carries `X-ProofAge-Sdk: laravel/{ProofAge::VERSION} php/{SDK version}` (for example
+`laravel/0.9.0 php/0.3.0`) and, unless a middleware sets its own, `User-Agent: ProofAge-Laravel/0.9.0
+ProofAge-PHP/0.3.0 (PHP 8.4.1)`. Neither is signed, and no middleware can remove this package's or
+the SDK's token. A package that wraps this one puts its own first by passing the SDK options
+`sdk_tokens` (`['acme-shop/2.1.0']`) and `user_agent_prefix` (`'AcmeShop/2.1.0'`) to
+`new ProofAgeClient($config)`.
+
 ### Secrets in dumps
 
 `dd()`, `dump()`, `print_r()` and `var_dump()` of the client, of a request or of a caught exception

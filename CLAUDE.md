@@ -19,7 +19,10 @@ reachable and GitHub's events feed carries no tag events for this repo). Reading
 Aug 2026 produced a `v0.3.0` tag on a fresh commit while Packagist already served `0.3.0` from a
 different commit; a re-crawl could have changed the contents of a released version.
 
-There is no `version` field in `composer.json` — the git tag alone is the release. Steps: verify
+There is no `version` field in `composer.json` — the git tag alone is the release. The release
+commit renames the changelog's `Unreleased` heading and bumps `ProofAge\Laravel\Facades\ProofAge::VERSION`
+to match (it is sent as `laravel/{version}` in `X-ProofAge-Sdk`; `tests/VersionTest.php` fails
+until both agree). Steps: verify
 with `check-release`, then `git tag vX.Y.Z && git push origin vX.Y.Z`, then confirm the pickup at
 `https://repo.packagist.org/p2/proofage/laravel-client.json` (each entry shows `version` and the
 `source.reference` it came from).

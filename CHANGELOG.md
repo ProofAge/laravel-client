@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+Requires `proofage/php-sdk` ^0.3.0, which identifies itself on every request (`X-ProofAge-Sdk`,
+`User-Agent`) and lets a wrapping package prepend its own token.
+
+### Added
+
+- Every request carries `X-ProofAge-Sdk: laravel/{version} php/{sdk version}` and, unless a
+  middleware sets one, `User-Agent: ProofAge-Laravel/{version} ProofAge-PHP/{sdk version} (PHP {PHP_VERSION})`,
+  whether it goes through the facade, the container singleton or a `ProofAgeClientFactory` client.
+  Neither header is signed.
+- `ProofAge\Laravel\Facades\ProofAge::VERSION`, the version those headers report, pinned to this
+  changelog by a test.
+- `new ProofAgeClient($config)` accepts the SDK's `sdk_tokens` and `user_agent_prefix` options; a
+  package wrapping this one goes in front of `laravel/...`.
+
 ## 0.8.0 - 2026-09-27
 
 Requires `proofage/php-sdk` ^0.2.0, which normalizes multipart fields so null and boolean values
