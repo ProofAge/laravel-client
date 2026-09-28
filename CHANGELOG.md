@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 - 2026-09-28
 
 Requires `proofage/php-sdk` ^0.3.0, which identifies itself on every request (`X-ProofAge-Sdk`,
 `User-Agent`) and lets a wrapping package prepend its own token.
