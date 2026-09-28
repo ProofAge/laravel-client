@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.1 - 2026-09-28
+
+Requires `proofage/php-sdk` ^0.3.1.
+
+### Fixed
+
+- `getConsent()` is documented as returning `version: int`, the type the API has always sent
+  (`php-sdk` 0.3.1 corrects the `@return` shape and AGENTS.md; the API's own documentation said
+  string until 2026-09-28). The value your code receives is unchanged.
+
 ## 0.9.0 - 2026-09-28
 
 Requires `proofage/php-sdk` ^0.3.0, which identifies itself on every request (`X-ProofAge-Sdk`,
