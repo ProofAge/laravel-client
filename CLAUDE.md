@@ -30,7 +30,8 @@ with `check-release`, then `git tag vX.Y.Z && git push origin vX.Y.Z`, then conf
 ## Changing the API surface
 
 Since 0.7.0 the resources, enums, exceptions, signing and the bundled OpenAPI spec live in
-`proofage/php-sdk` (checked out as the sibling `../proofage-php-sdk`), and so does the contract
+`proofage/php-sdk` (find its checkout by the git remote `ProofAge/php-sdk`; the folder name varies,
+and `.ai/guidelines/api-changes.md` in the app repo has the full checklist), and so does the contract
 workflow: `composer run sync-spec` and `tests/ApiContractTest.php` are run there, and the
 `@param`/`@return` shapes are on `ProofAge\Sdk\Resources\*`. The classes under `src/Resources/`
 and `src/Exceptions/` here are empty subclasses kept for backwards compatibility; a new resource
