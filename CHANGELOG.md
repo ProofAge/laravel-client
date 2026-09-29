@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.2 - 2026-09-29
+
+Requires `proofage/php-sdk` ^0.3.2.
+
+### Deprecated
+
+- The fields only the ProofAge widget sends are deprecated in `php-sdk` 0.3.2: `fingerprint` and
+  `page_url` on `create()`, the browser fields of `acceptConsent()`, and the capture fields and
+  the `liveness_selfie` type of `uploadMedia()`. The API still accepts them, so nothing changes for
+  code that sends them. The README and AGENTS.md no longer offer `liveness_selfie`.
+
 ## 0.9.1 - 2026-09-28
 
 Requires `proofage/php-sdk` ^0.3.1.

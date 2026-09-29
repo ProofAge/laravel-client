@@ -18,7 +18,7 @@ in `data`. `uploadMedia()` and `submit()` return `null` (the API answers an empt
   come back in every response and webhook; `metadata` is stored but never returned.
 - `acceptConsent()` takes exactly the `id` and `text_sha256` of `ProofAge::workspace()->getConsent()`
   (the active version); any other pair is rejected.
-- `uploadMedia()`: `type` is `selfie`, `liveness_selfie` or `document`; a document also needs
+- `uploadMedia()`: `type` is `selfie` or `document`; a document also needs
   `side` (`front`|`back`) and `document` (`id`|`driver_license`|`passport`|`residence_permit`).
   Images only. `document_front` / `document_back` are media types in `document()`'s output, not
   inputs.

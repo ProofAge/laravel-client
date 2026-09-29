@@ -138,7 +138,7 @@ ProofAge::verifications('verification-id')->acceptConsent([
     'text_sha256' => $consent['text_sha256'],
 ]);
 
-// Upload media: images only. `type` is selfie, liveness_selfie or document; a document also
+// Upload media: images only. `type` is selfie or document; a document also
 // needs `side` (front|back) and `document` (id|driver_license|passport|residence_permit).
 ProofAge::verifications('verification-id')->uploadMedia([
     'type' => 'selfie',
