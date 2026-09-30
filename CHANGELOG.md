@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.4 - 2026-09-30
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.4.0. `ProofAge::verifications($id)->document()` now describes
+  `document.type` and `document.issuing_country` on every workspace, and six more `fields` on
+  identity (KYC) workspaces (`middle_name`, `gender`, `nationality`, `place_of_birth`,
+  `issue_date`, `expiry_date`). Age workspaces receive only the four base fields. See the PHP
+  SDK's 0.4.0 changelog.
+
 ## 0.9.3 - 2026-09-30
 
 ### Fixed
