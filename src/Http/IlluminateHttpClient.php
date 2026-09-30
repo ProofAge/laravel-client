@@ -68,13 +68,9 @@ final class IlluminateHttpClient implements HttpClient
             // Each field pre-shaped as a {name, contents} part: Illuminate treats any array
             // value holding those two keys as an already-built part, so handing it the raw
             // field map would let a nested value that happens to have them be misread.
-            $fields = [];
-
-            foreach ($body->fields as $name => $value) {
-                $fields[] = ['name' => (string) $name, 'contents' => $value];
-            }
-
-            return $pending->asMultipart()->send($request->method, $request->url, ['multipart' => $fields]);
+            return $pending->asMultipart()->send($request->method, $request->url, [
+                'multipart' => self::parts($body->fields),
+            ]);
         }
 
         if ($body instanceof RawBody) {
@@ -91,5 +87,33 @@ final class IlluminateHttpClient implements HttpClient
         }
 
         return $pending->send($request->method, $request->url);
+    }
+
+    /**
+     * A nested field becomes one `name[key]` part per leaf, the names the SDK's own
+     * MultipartEncoder gives it and the ones PHP decodes back into the array that was signed.
+     * guzzlehttp/psr7 expands a nested `contents` array the same way itself, but only from
+     * 2.9.0; before that, which Laravel 12 allows, it throws "Invalid resource type: array".
+     *
+     * @param  array<int|string, mixed>  $fields
+     * @return list<array{name: string, contents: mixed}>
+     */
+    private static function parts(array $fields, string $prefix = ''): array
+    {
+        $parts = [];
+
+        foreach ($fields as $key => $value) {
+            $name = $prefix === '' ? (string) $key : $prefix.'['.$key.']';
+
+            if (is_array($value)) {
+                $parts = [...$parts, ...self::parts($value, $name)];
+
+                continue;
+            }
+
+            $parts[] = ['name' => $name, 'contents' => $value];
+        }
+
+        return $parts;
     }
 }
