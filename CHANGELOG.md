@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.9.3 - 2026-09-30
+
+### Fixed
+
+- 0.7.0 through 0.9.2 were a fatal error on every request, artisan command and queue job of a
+  Laravel 12 application on `symfony/var-dumper` below 7.4 — any whose lock file predates
+  2025-10-27 or that updated only this package: `Call to undefined method
+  Symfony\Component\VarDumper\Cloner\AbstractCloner::addDefaultCasters()`. The dump casters are
+  registered when Composer's autoloader loads, and that method only exists from 7.4, while
+  Laravel 12 allows `^7.2`. On older versions they are now appended to
+  `AbstractCloner::$defaultCasters`, the public property the method writes, so `dd()` stays
+  redacted there too. Laravel 13, which requires 7.4, was never affected.
+- A nested multipart field goes out as `name[key]` parts built here instead of a nested
+  `contents` array, which `guzzlehttp/psr7` only expands from 2.9.0 and before that rejected with
+  `Invalid resource type: array`. The wire format is unchanged: it is what 2.9.0 produces and what
+  the SDK's own transports send. No documented `uploadMedia()` field is an array.
+
+### Changed
+
+- CI installs the oldest dependencies the constraints allow in two more cells (Laravel 12 on
+  PHP 8.2, Laravel 13 on PHP 8.3); every other cell installs the newest, which is how both
+  failures above went unseen.
+
 ## 0.9.2 - 2026-09-29
 
 Requires `proofage/php-sdk` ^0.3.2.
