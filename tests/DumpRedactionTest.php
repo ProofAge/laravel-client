@@ -6,7 +6,9 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use ProofAge\Laravel\ProofAgeClient;
 use ProofAge\Laravel\Services\WebhookSignatureVerifier;
+use ProofAge\Laravel\Support\DumpCasters;
 use ProofAge\Sdk\Webhooks\WebhookVerifier;
+use Symfony\Component\VarDumper\Cloner\AbstractCloner;
 use Symfony\Component\VarDumper\Cloner\ClonerInterface;
 use Symfony\Component\VarDumper\Cloner\VarCloner;
 use Symfony\Component\VarDumper\Dumper\CliDumper;
@@ -98,6 +100,21 @@ class DumpRedactionTest extends TestCase
     {
         $this->assertNoSecretIn(new WebhookSignatureVerifier(self::SECRET, 300));
         $this->assertNoSecretIn(new WebhookVerifier(self::API_KEY, self::SECRET, 300));
+    }
+
+    /**
+     * The fatal this pins down only shows on symfony/var-dumper before 7.4, which the prefer-lowest
+     * CI job installs; on the version installed here it asserts the registration landed.
+     */
+    public function test_every_redacted_class_is_a_default_caster(): void
+    {
+        foreach (DumpCasters::CLASSES as $class) {
+            $this->assertSame(
+                [DumpCasters::class, 'castToDebugInfo'],
+                AbstractCloner::$defaultCasters[$class] ?? null,
+                "{$class} is not registered with VarDumper, so dd() of it shows the real properties."
+            );
+        }
     }
 
     private function assertNoSecretIn(mixed $value, string ...$alsoAbsent): void

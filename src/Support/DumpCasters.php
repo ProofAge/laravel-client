@@ -51,7 +51,18 @@ final class DumpCasters
             return;
         }
 
-        AbstractCloner::addDefaultCasters(array_fill_keys(self::CLASSES, [self::class, 'castToDebugInfo']));
+        $casters = array_fill_keys(self::CLASSES, [self::class, 'castToDebugInfo']);
+
+        // addDefaultCasters() arrived in symfony/var-dumper 7.4, and Laravel 12 allows ^7.2, where
+        // calling it was a fatal error on every request. Before 7.4 the public static property it
+        // appends to is the only way in; Laravel's own FoundationServiceProvider writes it directly.
+        if (method_exists(AbstractCloner::class, 'addDefaultCasters')) {
+            AbstractCloner::addDefaultCasters($casters);
+
+            return;
+        }
+
+        AbstractCloner::$defaultCasters = [...AbstractCloner::$defaultCasters, ...$casters];
     }
 
     /**
