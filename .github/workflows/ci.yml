@@ -28,17 +28,31 @@ jobs:
     #   Laravel 12  security ends  2027-02-24  -> PHP 8.2-8.5
     #   Laravel 13  security ends  2028-03-17  -> PHP 8.3-8.5
     #   PHP 8.2     security ends  2026-12-31  -> revisit then
+    #
+    # Every cell installs the newest dependencies the constraints allow, which is not what a
+    # consumer with an older lock file has. The two `lowest` cells install the oldest instead,
+    # on the oldest PHP each Laravel supports: 0.7.0-0.9.2 called a symfony/var-dumper 7.4 method
+    # that Laravel 12's ^7.2 does not guarantee, and fataled on every request of such an app
+    # while this matrix only ever saw 7.4+.
     strategy:
       fail-fast: false
       matrix:
         php-version: ['8.2', '8.3', '8.4', '8.5']
         laravel: ['12.*', '13.*']
+        dependencies: ['highest']
         exclude:
           # Laravel 13 requires PHP 8.3.
           - php-version: '8.2'
             laravel: '13.*'
+        include:
+          - php-version: '8.2'
+            laravel: '12.*'
+            dependencies: 'lowest'
+          - php-version: '8.3'
+            laravel: '13.*'
+            dependencies: 'lowest'
 
-    name: PHP ${{ matrix.php-version }} / Laravel ${{ matrix.laravel }}
+    name: PHP ${{ matrix.php-version }} / Laravel ${{ matrix.laravel }} / ${{ matrix.dependencies }}
 
     steps:
     - name: Checkout code
@@ -59,14 +73,19 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ steps.composer-cache.outputs.dir }}
-        key: ${{ runner.os }}-php${{ matrix.php-version }}-laravel${{ matrix.laravel }}-${{ hashFiles('**/composer.json') }}
+        key: ${{ runner.os }}-php${{ matrix.php-version }}-laravel${{ matrix.laravel }}-${{ matrix.dependencies }}-${{ hashFiles('**/composer.json') }}
         restore-keys: ${{ runner.os }}-php${{ matrix.php-version }}-
 
     - name: Set Laravel version
       run: composer require "illuminate/support:${{ matrix.laravel }}" "illuminate/http:${{ matrix.laravel }}" "illuminate/config:${{ matrix.laravel }}" --no-interaction --no-update
 
     - name: Install dependencies
+      if: matrix.dependencies == 'highest'
       run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+    - name: Install lowest dependencies
+      if: matrix.dependencies == 'lowest'
+      run: composer update --prefer-lowest --prefer-stable --no-progress --prefer-dist --optimize-autoloader
 
     - name: Create build directories
       run: mkdir -p build/logs
