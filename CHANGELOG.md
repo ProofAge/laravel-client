@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.5 - 2026-10-01
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.5.0. `ProofAge::verifications($id)->document()` describes
+  `address` on identity (KYC) workspaces (the printed text as read, not parsed, possibly with
+  line breaks), and decision webhooks now carry the same `document` object as `document()`,
+  without media. See the PHP SDK's 0.5.0 changelog.
+
 ## 0.9.4 - 2026-09-30
 
 ### Changed
