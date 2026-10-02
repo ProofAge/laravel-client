@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.6 - 2026-10-02
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.6.0. `ProofAge::verifications($id)->document()` describes
+  `document.issuing_subdivision`: the state or province that issued the document as a bare code
+  beside `issuing_country` (e.g. `FL` with `US`), or null. See the PHP SDK's 0.6.0 changelog.
+
 ## 0.9.5 - 2026-10-01
 
 ### Changed
