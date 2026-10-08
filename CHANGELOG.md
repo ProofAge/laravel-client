@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.0 - 2026-10-09
+
+### Added
+
+- Requires `proofage/php-sdk` ^0.8.0. `ProofAge::verifications()->list()` lists verifications
+  (filter by `status` or `external_id`, newest first, cursor paging),
+  `ProofAge::verifications($id)->setTestOutcome()` sets an outcome in a test workspace, and
+  `ProofAge::webhookSubscriptions()` creates, lists and deletes webhook subscriptions. See the PHP
+  SDK's 0.8.0 changelog; `manual_moderation.performed_by` is optional in subscription deliveries.
+
 ## 0.9.7 - 2026-10-08
 
 ### Changed

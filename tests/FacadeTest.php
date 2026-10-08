@@ -7,6 +7,7 @@ use ProofAge\Laravel\Facades\ProofAge;
 use ProofAge\Laravel\ProofAgeClient;
 use ProofAge\Laravel\Resources\VerificationResource;
 use ProofAge\Laravel\Resources\WorkspaceResource;
+use ProofAge\Sdk\Resources\WebhookSubscriptionResource;
 
 class FacadeTest extends TestCase
 {
@@ -53,6 +54,29 @@ class FacadeTest extends TestCase
         $this->assertIsArray($result);
     }
 
+    public function test_facade_lists_verifications_through_the_laravel_http_client(): void
+    {
+        $result = ProofAge::verifications()->list(['status' => 'approved', 'limit' => 5]);
+
+        $this->assertIsArray($result);
+        Http::assertSent(fn ($request): bool => $request->method() === 'GET'
+            && str_contains($request->url(), '/v1/verifications?')
+            && str_contains($request->url(), 'limit=5')
+            && str_contains($request->url(), 'status=approved'));
+    }
+
+    public function test_facade_reaches_webhook_subscriptions(): void
+    {
+        $subscriptions = ProofAge::webhookSubscriptions();
+
+        $this->assertInstanceOf(WebhookSubscriptionResource::class, $subscriptions);
+
+        $subscriptions->create(['url' => 'https://hooks.example.com/proofage']);
+
+        Http::assertSent(fn ($request): bool => $request->method() === 'POST'
+            && str_ends_with($request->url(), '/v1/webhook-subscriptions'));
+    }
+
     public function test_the_facade_docblock_names_only_real_client_and_resource_methods(): void
     {
         $doc = (string) (new \ReflectionClass(ProofAge::class))->getDocComment();
@@ -69,6 +93,13 @@ class FacadeTest extends TestCase
 
         foreach ($resourceMethods[1] as $method) {
             $this->assertTrue(method_exists(VerificationResource::class, $method), "The facade docblock names VerificationResource::{$method}(), which does not exist.");
+        }
+
+        $this->assertSame(1, preg_match('/webhookSubscriptions\(\) has (.+?)\./s', $doc, $listed));
+        preg_match_all('/(\w+)\(\)/', $listed[1], $resourceMethods);
+
+        foreach ($resourceMethods[1] as $method) {
+            $this->assertTrue(method_exists(WebhookSubscriptionResource::class, $method), "The facade docblock names WebhookSubscriptionResource::{$method}(), which does not exist.");
         }
 
         $this->assertSame(1, preg_match('/workspace\(\) has (.+?);/s', $doc, $listed));

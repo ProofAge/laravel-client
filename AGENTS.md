@@ -40,7 +40,10 @@ in `data`. `uploadMedia()` and `submit()` return `null` (the API answers an empt
   `config/proofage.php` (tag `config`); registers the middleware alias and the artisan command.
 - **Facade** `ProofAge\Laravel\Facades\ProofAge`: `workspace(): WorkspaceResource`,
   `verifications(?string $id = null): VerificationResource` (the `ProofAge\Laravel\Resources\*`
-  subclasses of the SDK resources).
+  subclasses of the SDK resources; `verifications()->list()` lists by status or `external_id`,
+  `verifications($id)->setTestOutcome()` works in test workspaces) and
+  `webhookSubscriptions(): \ProofAge\Sdk\Resources\WebhookSubscriptionResource` (`create()`,
+  `list()`, `delete()`).
 - **Client** `ProofAge\Laravel\ProofAgeClient extends ProofAge\Sdk\Client`: transport defaults to
   `ProofAge\Laravel\Http\IlluminateHttpClient` (sends through the `Http` facade, so `Http::fake()`
   intercepts; no retry or throw of its own) and exceptions default to
