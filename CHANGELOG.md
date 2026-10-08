@@ -1,14 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.9.7 - 2026-10-08
 
 ### Changed
 
-- Documentation only: webhook bodies now carry `event` (`status.updated`, or `data.updated` when a
+- Requires `proofage/php-sdk` ^0.7.0, which adds `ProofAge\Sdk\Enums\WebhookEvent`
+  (`status.updated`, `data.updated`). Webhook bodies now carry `event`: `data.updated` is sent when a
   tenant corrected document fields the reader got wrong, with the current status unchanged, the
-  corrected `document` and `changed_fields`). `examples/webhook-controller.php`, `AGENTS.md` and the
-  README read `event` before `status`. No code change and no `proofage/php-sdk` bump: the SDK has no
-  webhook model, only the `WebhookEvent` enum in its next release.
+  corrected `document` and `changed_fields`. `examples/webhook-controller.php`, `AGENTS.md` and the
+  README read `event` before `status`. See the PHP SDK's 0.7.0 changelog.
 
 ## 0.9.6 - 2026-10-02
 
