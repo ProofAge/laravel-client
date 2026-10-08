@@ -24,9 +24,12 @@ in `data`. `uploadMedia()` and `submit()` return `null` (the API answers an empt
   inputs.
 - `status` may be `documents_required` (`VerificationStatus::DOCUMENTS_REQUIRED`); map it with `tryFrom()` so a future status does not throw.
 - Webhooks: one URL per workspace, set in the ProofAge console, not per verification. One body
-  shape (`verification_id`, `status`, `external_id`, `external_metadata`, `reason`, `timestamp`,
-  plus `duplicate_*`, `fingerprint_signals`, `manual_moderation` when present) — there is no
-  `event_type`. `X-ProofAge-Webhook-Delivery-Id` is stable across retries of a delivery. The route
+  shape (`verification_id`, `event`, `status`, `external_id`, `external_metadata`, `reason`, `timestamp`,
+  `document`, plus `duplicate_*`, `fingerprint_signals`, `manual_moderation` when present). Read
+  `event` first: `status.updated` (or absent, a retry of an older delivery) is a status change;
+  `data.updated` is a tenant's correction of document fields, with the current unchanged `status`, the
+  corrected `document` and `changed_fields` (names only) — not a decision, so do not run the status
+  handling on it. There is no `event_type`. `X-ProofAge-Webhook-Delivery-Id` is stable across retries of a delivery. The route
   needs no CSRF check: put it in `routes/api.php`, or exclude it in `validateCsrfTokens(except:)`.
   Webhooks are signed with the workspace's **active** secret key only.
 

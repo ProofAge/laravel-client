@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Documentation only: webhook bodies now carry `event` (`status.updated`, or `data.updated` when a
+  tenant corrected document fields the reader got wrong, with the current status unchanged, the
+  corrected `document` and `changed_fields`). `examples/webhook-controller.php`, `AGENTS.md` and the
+  README read `event` before `status`. No code change and no `proofage/php-sdk` bump: the SDK has no
+  webhook model, only the `WebhookEvent` enum in its next release.
+
 ## 0.9.6 - 2026-10-02
 
 ### Changed

@@ -25,6 +25,7 @@ use ProofAge\Sdk\Enums\WebhookReason;
  *
  *     {
  *         "verification_id": "019d...",
+ *         "event": "status.updated",         // or data.updated; absent means status.updated
  *         "status": "approved",              // approved | declined | resubmission_requested | review | abandoned | expired
  *         "external_id": "123",              // what you passed to create(), or null
  *         "external_metadata": {"plan": "pro"}, // what you passed to create(), or null
@@ -35,6 +36,10 @@ use ProofAge\Sdk\Enums\WebhookReason;
  *         "duplicate_of": {"verification_id": "019c...", "external_id": "77"},
  *         // only when present: "fingerprint_signals": {...}, "manual_moderation": {...}
  *     }
+ *
+ * `data.updated` is not a decision: a tenant corrected document fields the reader got wrong. It has the
+ * same body, with the CURRENT status (unchanged), the corrected "document" and "changed_fields":
+ * ["date_of_birth"] (names only). Read `event` before `status`.
  *
  * Answer 2xx quickly; anything else (or a timeout) makes ProofAge retry the same delivery.
  */
@@ -63,6 +68,10 @@ class ProofAgeWebhookController extends Controller
                 'verification_id' => $payload['verification_id'] ?? null,
                 'external_id' => $payload['external_id'] ?? null,
             ]);
+        } elseif (($payload['event'] ?? 'status.updated') === 'data.updated') {
+            // A correction of document fields: the status is unchanged and nothing was decided,
+            // so keep the decision as it is and refresh only what you store from `document`.
+            $this->refreshDocumentFields($user, $payload);
         } else {
             $this->apply($user, $payload);
         }
@@ -72,6 +81,21 @@ class ProofAgeWebhookController extends Controller
         }
 
         return response()->json(['status' => 'received']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function refreshDocumentFields(User $user, array $payload): void
+    {
+        $fields = $payload['document']['fields'] ?? [];
+
+        // Store only what you need, and only the names listed in `changed_fields` if you want to
+        // touch just those. The body carries the person's name and birth date: do not log it.
+        $user->forceFill([
+            'proofage_document_number' => $fields['document_number'] ?? $user->proofage_document_number,
+            'proofage_date_of_birth' => $fields['date_of_birth'] ?? $user->proofage_date_of_birth,
+        ])->save();
     }
 
     /**

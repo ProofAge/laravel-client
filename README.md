@@ -256,6 +256,7 @@ Sent when a verification's status becomes `approved`, `declined`, `resubmission_
 ```json
 {
     "verification_id": "019d...",
+    "event": "status.updated",
     "status": "declined",
     "external_id": "123",
     "external_metadata": {"plan": "pro"},
@@ -268,8 +269,11 @@ Sent when a verification's status becomes `approved`, `declined`, `resubmission_
 `duplicate_count` and `duplicate_of` (`verification_id`, `external_id`) are added when the face
 matched another account, and `fingerprint_signals` and `manual_moderation` when they apply. Each
 delivery carries an `X-ProofAge-Webhook-Delivery-Id` header that stays the same across retries of
-that delivery: use it to process a delivery once. The repository's `examples/webhook-controller.php` handles each
-status; the SDK's `AGENTS.md` has the full body.
+that delivery: use it to process a delivery once. Every body also has `event`: `status.updated` for a
+decision, `data.updated` when a tenant corrected document fields the reader got wrong (`status` is then the
+current one, unchanged, `document` holds the corrected values and `changed_fields` names what changed).
+Read `event` before `status`; a body without it is `status.updated`. The repository's
+`examples/webhook-controller.php` handles `data.updated` first and then each status; the SDK's `AGENTS.md` has the full body.
 
 ### How It Works
 
