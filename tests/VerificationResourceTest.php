@@ -51,7 +51,7 @@ class VerificationResourceTest extends TestCase
     {
         $client = $this->makeFakedClient([
             'api.test.com/v1/verifications' => Http::response($this->verificationBody('ver_new', [
-                'url' => 'https://idv.proofage.xyz/v/eyJ...',
+                'url' => 'https://idv.proofage.net/v/eyJ...',
             ]), 201),
         ]);
 
@@ -65,7 +65,7 @@ class VerificationResourceTest extends TestCase
         $this->assertEquals('created', $result['status']);
         $this->assertSame('https://example.com/verification/done', $result['redirect_url']);
         $this->assertSame('user-42', $result['external_id']);
-        $this->assertSame('https://idv.proofage.xyz/v/eyJ...', $result['url']);
+        $this->assertSame('https://idv.proofage.net/v/eyJ...', $result['url']);
 
         Http::assertSent(function ($request) {
             return $request->method() === 'POST'

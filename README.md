@@ -4,7 +4,7 @@
 
 A Laravel package for integrating with the ProofAge API, featuring automatic HMAC authentication and a fluent interface.
 
-Full API reference: https://docs.proofage.xyz/api-reference.html#/
+Full API reference: https://docs.proofage.net/api-reference
 
 ## About ProofAge
 
@@ -35,7 +35,7 @@ Configure your environment variables:
 ```env
 PROOFAGE_API_KEY=your-api-key
 PROOFAGE_SECRET_KEY=your-secret-key
-PROOFAGE_BASE_URL=https://api.proofage.xyz
+PROOFAGE_BASE_URL=https://api.proofage.net
 PROOFAGE_VERSION=v1
 ```
 
@@ -507,7 +507,7 @@ In your own application's tests, `Http::fake()` intercepts every request the cli
 multipart uploads (`$request->hasFile('file')`) and the signed headers (`$request->header('X-HMAC-Signature')`):
 
 ```php
-Http::fake(['api.proofage.xyz/v1/workspace' => Http::response(['id' => 'ws_1', 'name' => 'Acme'])]);
+Http::fake(['api.proofage.net/v1/workspace' => Http::response(['id' => 'ws_1', 'name' => 'Acme'])]);
 
 ProofAge::workspace()->get();
 
@@ -520,7 +520,7 @@ double the SDK ships: `new ProofAgeClient($config, $fake)`.
 ## Additional Resources
 
 - **Platform:** https://proofage.xyz
-- **Live Demo:** https://demo.proofage.xyz
+- **Live Demo:** https://demo.proofage.net
 - **Node SDK:** `@proofage/node` on npm
 
 ### Integrations for other platforms

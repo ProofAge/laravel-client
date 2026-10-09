@@ -21,7 +21,7 @@ use ProofAge\Sdk\Exceptions\ValidationException;
 $client = new Client([
     'api_key' => 'your-api-key',
     'secret_key' => 'your-secret-key',
-    'base_url' => 'https://api.proofage.xyz',
+    'base_url' => 'https://api.proofage.net',
     'version' => 'v1',
 ]);
 

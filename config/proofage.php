@@ -15,7 +15,7 @@ return [
 
     'secret_key' => env('PROOFAGE_SECRET_KEY'),
 
-    'base_url' => env('PROOFAGE_BASE_URL', 'https://api.proofage.xyz'),
+    'base_url' => env('PROOFAGE_BASE_URL', 'https://api.proofage.net'),
 
     'version' => env('PROOFAGE_VERSION', 'v1'),
 

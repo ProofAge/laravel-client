@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0 - 2026-10-09
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.9.0. The default `base_url` (`PROOFAGE_BASE_URL`) is now
+  `https://api.proofage.net`, where the API has moved. `https://api.proofage.xyz` keeps answering with
+  the same keys and signatures, so a `PROOFAGE_BASE_URL` that names it needs no change. The README,
+  `AGENTS.md`, the examples and the docs links name the new hosts.
+
 ## 0.10.0 - 2026-10-09
 
 ### Added

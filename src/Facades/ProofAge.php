@@ -40,7 +40,7 @@ class ProofAge extends Facade
      * CHANGELOG.md (tests/VersionTest.php); bumped in the release commit. The SDK's own is
      * ProofAge\Sdk\Client::VERSION.
      */
-    public const VERSION = '0.10.0';
+    public const VERSION = '0.11.0';
 
     /**
      * Get the registered name of the component.

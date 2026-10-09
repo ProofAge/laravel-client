@@ -10,11 +10,11 @@
         }
     ],
     "support": {
-        "docs": "https://docs.proofage.xyz/api-reference.html#/"
+        "docs": "https://docs.proofage.net/api-reference"
     },
     "require": {
         "php": "^8.2",
-        "proofage/php-sdk": "^0.8.0",
+        "proofage/php-sdk": "^0.9.0",
         "illuminate/http": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
         "illuminate/config": "^12.0|^13.0"

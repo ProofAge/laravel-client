@@ -59,7 +59,7 @@ The package supports the following configuration options in `config/proofage.php
 return [
     'api_key' => env('PROOFAGE_API_KEY'),
     'secret_key' => env('PROOFAGE_SECRET_KEY'),
-    'base_url' => env('PROOFAGE_BASE_URL', 'https://api.proofage.xyz'),
+    'base_url' => env('PROOFAGE_BASE_URL', 'https://api.proofage.net'),
     'version' => env('PROOFAGE_VERSION', 'v1'),
     'timeout' => env('PROOFAGE_TIMEOUT', 30),
     'retry_attempts' => env('PROOFAGE_RETRY_ATTEMPTS', 3),
@@ -207,5 +207,5 @@ the signature are masked in what they receive.
 
 For support and questions:
 - Email: support@proofage.xyz
-- Documentation: https://docs.proofage.xyz
+- Documentation: https://docs.proofage.net
 - GitHub Issues: https://github.com/proofage/laravel-client/issues

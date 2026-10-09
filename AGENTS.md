@@ -57,7 +57,7 @@ in `data`. `uploadMedia()` and `submit()` return `null` (the API answers an empt
   `retry_attempts`, `retry_delay`, `download_retry_attempts`, `webhook_tolerance` fall back to
   `proofage.*` (`ProofAge\Laravel\Support\ConfigResolver`).
 - **Config keys / env**: `api_key` (`PROOFAGE_API_KEY`), `secret_key` (`PROOFAGE_SECRET_KEY`),
-  `base_url` (`PROOFAGE_BASE_URL`, default `https://api.proofage.xyz`), `version`
+  `base_url` (`PROOFAGE_BASE_URL`, default `https://api.proofage.net`), `version`
   (`PROOFAGE_VERSION`, `v1`), `timeout` (`PROOFAGE_TIMEOUT`, 30), `retry_attempts`
   (`PROOFAGE_RETRY_ATTEMPTS`, 3), `retry_delay` (`PROOFAGE_RETRY_DELAY`, 1000 ms),
   `download_retry_attempts` (`PROOFAGE_DOWNLOAD_RETRY_ATTEMPTS`, 1), `webhook_tolerance`
