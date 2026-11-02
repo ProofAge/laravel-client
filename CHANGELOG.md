@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.1 - 2026-11-02
+
+### Changed
+
+- The README, `INSTALLATION.md`, `LICENSE.md` and the `composer.json` author e-mail point at
+  `proofage.net`. No code changes.
+
 ## 0.11.0 - 2026-10-09
 
 ### Changed
