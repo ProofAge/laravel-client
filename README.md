@@ -1,6 +1,6 @@
 # ProofAge Laravel Client — Age Verification for Laravel
 
-**Platform:** https://proofage.xyz | **Packagist:** https://packagist.org/packages/proofage/laravel-client
+**Platform:** https://proofage.net | **Packagist:** https://packagist.org/packages/proofage/laravel-client
 
 A Laravel package for integrating with the ProofAge API, featuring automatic HMAC authentication and a fluent interface.
 
@@ -519,7 +519,7 @@ double the SDK ships: `new ProofAgeClient($config, $fake)`.
 
 ## Additional Resources
 
-- **Platform:** https://proofage.xyz
+- **Platform:** https://proofage.net
 - **Live Demo:** https://demo.proofage.net
 - **Node SDK:** `@proofage/node` on npm
 

@@ -206,6 +206,6 @@ the signature are masked in what they receive.
 ## Support
 
 For support and questions:
-- Email: support@proofage.xyz
+- Email: support@proofage.net
 - Documentation: https://docs.proofage.net
 - GitHub Issues: https://github.com/proofage/laravel-client/issues

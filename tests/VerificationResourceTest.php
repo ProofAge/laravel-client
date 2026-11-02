@@ -130,7 +130,7 @@ class VerificationResourceTest extends TestCase
                 'id' => 3,
                 'version' => '2026-09-01',
                 'text_sha256' => $sha = hash('sha256', 'consent text'),
-                'url' => 'https://proofage.xyz/consent/2026-09-01',
+                'url' => 'https://proofage.net/consent/2026-09-01',
             ]),
             'api.test.com/v1/verifications/ver_123/consent' => Http::response([
                 'consent_version_id' => 3,
