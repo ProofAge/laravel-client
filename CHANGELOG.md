@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Requires `proofage/php-sdk` ^0.10.0. `ProofAge::verifications($id)->erasePersonalData(['reason_code' => …, 'reason' => …])`
+  erases a verification's personal data through `DELETE /v1/verifications/{id}/personal-data` and
+  returns the verification with its `erasure` block; `ProofAge\Sdk\Enums\ErasureReasonCode` lists the
+  reason codes. Only `approved`, `declined`, `abandoned` and `expired` verifications can be erased.
+  See the PHP SDK's 0.10.0 changelog.
+
 ## 0.11.1 - 2026-11-02
 
 ### Changed

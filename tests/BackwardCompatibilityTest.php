@@ -20,6 +20,7 @@ use ProofAge\Laravel\Resources\WorkspaceResource;
 use ProofAge\Laravel\Services\WebhookSignatureVerifier;
 use ProofAge\Sdk\Client as SdkClient;
 use ProofAge\Sdk\Enums\BlockFaceReasonCode;
+use ProofAge\Sdk\Enums\ErasureReasonCode;
 use ProofAge\Sdk\Enums\VerificationStatus;
 use ProofAge\Sdk\Enums\WebhookReason;
 use ProofAge\Sdk\Exceptions\AuthenticationException as SdkAuthenticationException;
@@ -50,6 +51,7 @@ class BackwardCompatibilityTest extends TestCase
         $this->assertInstanceOf(SdkWorkspaceResource::class, $workspace);
         $this->assertInstanceOf(VerificationResource::class, $verification);
         $this->assertInstanceOf(SdkVerificationResource::class, $verification);
+        $this->assertTrue(method_exists($verification, 'erasePersonalData'), 'The facade reaches the SDK\'s erasePersonalData().');
     }
 
     public function test_a_directly_constructed_client_returns_the_same_resource_classes(): void
@@ -335,7 +337,7 @@ class BackwardCompatibilityTest extends TestCase
     {
         // The one edit a consumer must make: import ProofAge\Sdk\Enums\* instead. Deliberate
         // (an enum cannot be subclassed, so a twin would drift) and therefore tested.
-        foreach (['VerificationStatus', 'WebhookReason', 'BlockFaceReasonCode'] as $enum) {
+        foreach (['VerificationStatus', 'WebhookReason', 'BlockFaceReasonCode', 'ErasureReasonCode'] as $enum) {
             $this->assertFalse(enum_exists("ProofAge\\Laravel\\Enums\\{$enum}"), "ProofAge\\Laravel\\Enums\\{$enum} must not exist.");
             $this->assertFalse(class_exists("ProofAge\\Laravel\\Enums\\{$enum}"));
             $this->assertTrue(enum_exists("ProofAge\\Sdk\\Enums\\{$enum}"), "ProofAge\\Sdk\\Enums\\{$enum} is the replacement.");
@@ -343,6 +345,7 @@ class BackwardCompatibilityTest extends TestCase
 
         $this->assertSame('approved', VerificationStatus::APPROVED->value);
         $this->assertSame('underage', BlockFaceReasonCode::UNDERAGE->value);
+        $this->assertSame('data_subject_request', ErasureReasonCode::DATA_SUBJECT_REQUEST->value);
         $this->assertTrue(WebhookReason::isAmlBlocklist('aml.blocklist.face_match'));
     }
 

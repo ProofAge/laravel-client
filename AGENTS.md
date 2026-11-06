@@ -9,7 +9,8 @@ spec at `vendor/proofage/php-sdk/resources/openapi.json` and the `@param`/`@retu
 Methods on `ProofAge::workspace()` and `ProofAge::verifications($id)` return decoded JSON as
 `array|null`; they are the SDK resources under this package's names. The API never wraps a body
 in `data`. `uploadMedia()` and `submit()` return `null` (the API answers an empty `200`),
-`blockFace()` returns `null` (`204`), `downloadMedia()` a PSR-7 stream.
+`blockFace()` returns `null` (`204`), `erasePersonalData()` the verification with its `erasure`
+block, `downloadMedia()` a PSR-7 stream.
 
 ## Integration facts that are easy to get wrong
 

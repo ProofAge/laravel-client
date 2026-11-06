@@ -412,6 +412,7 @@ Additional workspaces only need `api_key` and `secret_key`. If a workspace conne
 - `verifications(string $id)->downloadMediaTo(string $mediaId, string $path)` - Download one media file straight to disk
 - `verifications(string $id)->estimation()` - Get age-threshold and gender estimation
 - `verifications(string $id)->blockFace(?array $data)` - Block the verification face for AML
+- `verifications(string $id)->erasePersonalData(array $data)` - Erase the verification's personal data (`reason_code`, optional `reason`); returns the verification with its `erasure` block. Only `approved`, `declined`, `abandoned` and `expired` verifications can be erased
 
 Every method's exact request and response shape is documented in the SDK: its `AGENTS.md`
 (`vendor/proofage/php-sdk/AGENTS.md`), the `@param`/`@return` PHPDoc on `ProofAge\Sdk\Resources\*`,
@@ -419,8 +420,9 @@ and the bundled `vendor/proofage/php-sdk/resources/openapi.json`.
 
 ### Enums
 
-`ProofAge\Sdk\Enums\VerificationStatus`, `ProofAge\Sdk\Enums\WebhookReason` and
-`ProofAge\Sdk\Enums\BlockFaceReasonCode` model the `status`, AML `reason` and `reason_code` values.
+`ProofAge\Sdk\Enums\VerificationStatus`, `ProofAge\Sdk\Enums\WebhookReason`,
+`ProofAge\Sdk\Enums\BlockFaceReasonCode` and `ProofAge\Sdk\Enums\ErasureReasonCode` model the `status`,
+AML `reason`, blocking `reason_code` and erasure `reason_code` values.
 (`ProofAge\Laravel\Enums\*` was removed in 0.7.0.)
 
 A verification's `status` can also be `documents_required`, taken from its latest attempt

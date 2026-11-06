@@ -15,8 +15,8 @@ use ProofAge\Sdk\Resources\WebhookSubscriptionResource;
  * Proxies to the ProofAgeClient singleton. The API calls live on the resources:
  * workspace() has get() and getConsent(); verifications() has create(), list(), find(), get(),
  * acceptConsent(), uploadMedia(), submit(), document(), downloadMedia(), downloadMediaTo(),
- * estimation(), blockFace() and setTestOutcome(). webhookSubscriptions() has create(), list()
- * and delete().
+ * estimation(), blockFace(), erasePersonalData() and setTestOutcome().
+ * webhookSubscriptions() has create(), list() and delete().
  *
  * @method static WorkspaceResource workspace()
  * @method static VerificationResource verifications(?string $id = null)

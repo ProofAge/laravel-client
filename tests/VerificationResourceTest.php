@@ -520,6 +520,43 @@ class VerificationResourceTest extends TestCase
         });
     }
 
+    public function test_erase_personal_data_sends_a_signed_delete_with_a_body_through_the_laravel_transport(): void
+    {
+        $client = $this->makeFakedClient([
+            'api.test.com/v1/verifications/ver_123/personal-data' => Http::response([
+                'id' => 'ver_123',
+                'status' => 'approved',
+                'erasure' => [
+                    'erased_at' => '2026-11-06T12:00:00+00:00',
+                    'scope' => 'personal_data',
+                    'reason' => 'data_subject_request',
+                    'requested_via' => 'customer',
+                ],
+            ]),
+        ]);
+
+        $result = $client->verifications('ver_123')->erasePersonalData([
+            'reason_code' => 'data_subject_request',
+            'reason' => 'Asked by email',
+        ]);
+
+        $this->assertSame('customer', $result['erasure']['requested_via']);
+
+        $expectedBody = json_encode(['reason_code' => 'data_subject_request', 'reason' => 'Asked by email']);
+        $expectedSignature = hash_hmac(
+            'sha256',
+            'DELETE/v1/verifications/ver_123/personal-data'.$expectedBody,
+            'test-secret-key'
+        );
+
+        Http::assertSent(function ($request) use ($expectedBody, $expectedSignature) {
+            return $request->method() === 'DELETE'
+                && str_contains($request->url(), '/v1/verifications/ver_123/personal-data')
+                && $request->body() === $expectedBody
+                && $request->header('X-HMAC-Signature') === [$expectedSignature];
+        });
+    }
+
     public function test_reused_client_does_not_duplicate_auth_headers_between_requests(): void
     {
         $client = $this->makeFakedClient([
