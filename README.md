@@ -401,7 +401,7 @@ Additional workspaces only need `api_key` and `secret_key`. If a workspace conne
 
 ### Verifications
 
-- `verifications()->create(array $data)` - Create a new verification
+- `verifications()->create(array $data)` - Create a new verification; with `reference_verification_id` it creates a face re-verification of an approved earlier verification ([guide](https://docs.proofage.net/integration/face-reverification))
 - `verifications()->find(string $id)` - Get verification by ID
 - `verifications(string $id)->get()` - Get the verification the resource was built for
 - `verifications(string $id)->acceptConsent(array $data)` - Accept consent

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.0 - 2026-11-14
+
+### Added
+
+- Requires `proofage/php-sdk` ^0.11.0. Face re-verification: `ProofAge::verifications()->create([...])`
+  takes `reference_verification_id`, the id of an approved, document-based verification of the same
+  workspace. The person takes a selfie only; it is compared 1:1 with that verification's face and
+  decided automatically, and it is not billed. Responses and webhooks of a re-verification carry a
+  `reauth` array (`reference_verification_id`, `reference_verified_at`, `similarity`). See the PHP
+  SDK's 0.11.0 changelog and https://docs.proofage.net/integration/face-reverification.
+
 ## 0.12.0 - 2026-11-06
 
 ### Added

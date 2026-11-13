@@ -17,6 +17,10 @@ block, `downloadMedia()` a PSR-7 stream.
 - `callback_url` on `create()` is where the person's **browser** is sent after the flow (echoed as
   `redirect_url`), not a webhook URL. Correlate with `external_id` / `external_metadata`, which
   come back in every response and webhook; `metadata` is stored but never returned.
+- Face re-verification: pass `reference_verification_id` (an approved, document-based verification of
+  the same workspace) to `create()`; the session is selfie-only, compared 1:1 with that face and not
+  billed. Its responses and webhooks carry a `reauth` array; on other sessions the key is absent.
+  Refusals and limits are in the PHP SDK's `AGENTS.md`.
 - `acceptConsent()` takes exactly the `id` and `text_sha256` of `ProofAge::workspace()->getConsent()`
   (the active version); any other pair is rejected.
 - `uploadMedia()`: `type` is `selfie` or `document`; a document also needs
