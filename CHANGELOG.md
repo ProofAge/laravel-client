@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.0 - 2026-11-14
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.12.0. **Breaking for 0.x:** the `reauth` array of a face
+  re-verification no longer carries `similarity`; it holds `reference_verification_id` and
+  `reference_verified_at`. The decision (`approved`, or `declined` with reason
+  `reference.face.mismatch`) is the answer. See the PHP SDK's 0.12.0 changelog.
+
 ## 0.13.0 - 2026-11-14
 
 ### Added
