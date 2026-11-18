@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.0 - 2026-11-18
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.13.0. `ProofAge::workspace()->get()` now includes
+  `webhook_include_document_data`. When it is `false`, webhooks to the workspace's `webhook_url`
+  carry no `document`, `fingerprint_signals` or `manual_moderation.performed_by`, and no
+  `data.updated` is sent there. See the PHP SDK's 0.13.0 changelog.
+
 ## 0.14.0 - 2026-11-14
 
 ### Changed
