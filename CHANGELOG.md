@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.0 - 2026-11-19
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.14.0. A `PROOFAGE_BASE_URL` (or `base_url`) that ends in `/v1`,
+  the address the API reference prints, no longer makes every call go to `/v1/v1/...` and fail with
+  404: the SDK drops the trailing version. The default stays `https://api.proofage.net`. See the
+  PHP SDK's 0.14.0 changelog.
+
 ## 0.15.0 - 2026-11-18
 
 ### Changed
