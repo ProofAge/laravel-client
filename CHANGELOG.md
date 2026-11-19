@@ -1,14 +1,14 @@
 # Changelog
 
-## 0.16.0 - 2026-11-19
+## 0.17.0 - 2026-11-19
 
 ### Changed
 
-- Requires `proofage/php-sdk` ^0.14.0. Every request now carries `X-Timestamp` and is signed over
+- Requires `proofage/php-sdk` ^0.15.0. Every request now carries `X-Timestamp` and is signed over
   `{timestamp}.{canonical}`, read and signed again on every retry, so keep the server clock right
   (the API refuses a timestamp more than 300 seconds off with `TIMESTAMP_OUT_OF_RANGE`, and a repeated
   signature with `REPLAYED_REQUEST`). A middleware that copies a signed request's headers and re-sends
-  it later must copy `X-Timestamp` with them. See the PHP SDK's 0.14.0 changelog.
+  it later must copy `X-Timestamp` with them. See the PHP SDK's 0.15.0 changelog.
 
 ### Added
 
@@ -17,6 +17,15 @@
   your own, or a UUID v4 the SDK generates per call and reuses on its retries. A create that carries one
   is retried after a timeout or a 5xx without creating twice, and a `409 IDEMPOTENCY_KEY_IN_PROGRESS` is
   retried after its `Retry-After`. The same key with a different request throws `409 IDEMPOTENCY_KEY_REUSED`.
+
+## 0.16.0 - 2026-11-19
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.14.0. A `PROOFAGE_BASE_URL` (or `base_url`) that ends in `/v1`,
+  the address the API reference prints, no longer makes every call go to `/v1/v1/...` and fail with
+  404: the SDK drops the trailing version. The default stays `https://api.proofage.net`. See the
+  PHP SDK's 0.14.0 changelog.
 
 ## 0.15.0 - 2026-11-18
 
