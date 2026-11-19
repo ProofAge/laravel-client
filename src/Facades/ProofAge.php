@@ -17,6 +17,8 @@ use ProofAge\Sdk\Resources\WebhookSubscriptionResource;
  * acceptConsent(), uploadMedia(), submit(), document(), downloadMedia(), downloadMediaTo(),
  * estimation(), blockFace(), erasePersonalData() and setTestOutcome().
  * webhookSubscriptions() has create(), list() and delete().
+ * verifications()->create() and webhookSubscriptions()->create() take an optional
+ * `$idempotencyKey` second argument; without one the SDK generates a key per call.
  *
  * @method static WorkspaceResource workspace()
  * @method static VerificationResource verifications(?string $id = null)
@@ -40,7 +42,7 @@ class ProofAge extends Facade
      * CHANGELOG.md (tests/VersionTest.php); bumped in the release commit. The SDK's own is
      * ProofAge\Sdk\Client::VERSION.
      */
-    public const VERSION = '0.15.0';
+    public const VERSION = '0.16.0';
 
     /**
      * Get the registered name of the component.

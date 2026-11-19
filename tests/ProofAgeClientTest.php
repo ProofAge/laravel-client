@@ -128,12 +128,11 @@ class ProofAgeClientTest extends TestCase
         $client->verifications()->create($data);
 
         $expectedCanonical = 'POST/v1/verifications'.$rawBody;
-        $expectedSignature = hash_hmac('sha256', $expectedCanonical, 'test-secret-key');
 
-        Http::assertSent(function ($request) use ($rawBody, $expectedSignature) {
+        Http::assertSent(function ($request) use ($rawBody, $expectedCanonical) {
             return $request->body() === $rawBody
                 && strlen($request->header('X-HMAC-Signature')[0]) === 64
-                && $request->header('X-HMAC-Signature') === [$expectedSignature];
+                && $request->header('X-HMAC-Signature') === [self::expectedSignature($request, $expectedCanonical)];
         });
     }
 

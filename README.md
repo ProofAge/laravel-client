@@ -106,6 +106,12 @@ $verification = ProofAge::verifications()->create([
 // Send the person to the hosted verification flow at $verification['url'],
 // e.g. redirect()->away($verification['url']); the decision arrives by webhook.
 
+// create() sends an Idempotency-Key (a UUID v4 the SDK generates and reuses on its own retries), so a
+// timeout or a 5xx never creates a second verification. Pass your own to make your own retry safe too:
+// the same key and request within 24 hours returns the first response; another request with it throws
+// 409 IDEMPOTENCY_KEY_REUSED. 1 to 255 printable ASCII characters.
+$verification = ProofAge::verifications()->create(['external_id' => (string) $order->id], idempotencyKey: 'order-'.$order->id);
+
 // Get verification details
 $verification = ProofAge::verifications()->find('verification-id');
 

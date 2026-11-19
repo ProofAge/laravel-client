@@ -108,7 +108,7 @@ class SdkIdentificationTest extends TestCase
 
         $request = $this->sentRequests()[0];
         $this->assertSame(
-            [hash_hmac('sha256', 'POST/v1/verifications'.$request->body(), 'test-secret-key')],
+            [self::expectedSignature($request, 'POST/v1/verifications'.$request->body())],
             $request->header('X-HMAC-Signature'),
         );
     }

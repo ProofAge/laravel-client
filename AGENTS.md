@@ -48,7 +48,13 @@ block, `downloadMedia()` a PSR-7 stream.
   subclasses of the SDK resources; `verifications()->list()` lists by status or `external_id`,
   `verifications($id)->setTestOutcome()` works in test workspaces) and
   `webhookSubscriptions(): \ProofAge\Sdk\Resources\WebhookSubscriptionResource` (`create()`,
-  `list()`, `delete()`).
+  `list()`, `delete()`). `verifications()->create($data, $idempotencyKey = null)` and
+  `webhookSubscriptions()->create($data, $idempotencyKey = null)` send an `Idempotency-Key` (the SDK
+  generates a UUID v4 per call, reused on its retries; see the SDK's AGENTS.md, *Idempotency*).
+- **Signing**: every request carries `X-Timestamp` and is signed over `{timestamp}.{canonical}`, again on
+  each retry (the API accepts a timestamped request once: a repeated signature is `401 REPLAYED_REQUEST`,
+  a timestamp more than 300 seconds off is `401 TIMESTAMP_OUT_OF_RANGE`). The SDK does this; this package
+  sends the headers untouched.
 - **Client** `ProofAge\Laravel\ProofAgeClient extends ProofAge\Sdk\Client`: transport defaults to
   `ProofAge\Laravel\Http\IlluminateHttpClient` (sends through the `Http` facade, so `Http::fake()`
   intercepts; no retry or throw of its own) and exceptions default to
