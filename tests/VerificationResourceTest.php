@@ -326,9 +326,7 @@ class VerificationResourceTest extends TestCase
 
         $client->verifications('ver_1')->downloadMedia('med_1');
 
-        $expected = hash_hmac('sha256', 'GET/v1/verifications/ver_1/media/med_1', 'test-secret-key');
-
-        Http::assertSent(fn ($request) => $request->header('X-HMAC-Signature')[0] === $expected);
+        Http::assertSent(fn ($request) => $request->header('X-HMAC-Signature')[0] === self::expectedSignature($request, 'GET/v1/verifications/ver_1/media/med_1'));
     }
 
     public function test_download_media_to_writes_the_file_to_disk(): void
@@ -506,17 +504,11 @@ class VerificationResourceTest extends TestCase
         $this->assertNull($result);
 
         $expectedBody = json_encode(['reason' => 'text here']);
-        $expectedSignature = hash_hmac(
-            'sha256',
-            'POST/v1/verifications/ver_123/blocked-face'.$expectedBody,
-            'test-secret-key'
-        );
-
-        Http::assertSent(function ($request) use ($expectedBody, $expectedSignature) {
+        Http::assertSent(function ($request) use ($expectedBody) {
             return $request->method() === 'POST'
                 && str_contains($request->url(), '/v1/verifications/ver_123/blocked-face')
                 && $request->body() === $expectedBody
-                && $request->header('X-HMAC-Signature') === [$expectedSignature];
+                && $request->header('X-HMAC-Signature') === [self::expectedSignature($request, 'POST/v1/verifications/ver_123/blocked-face'.$expectedBody)];
         });
     }
 
@@ -543,17 +535,11 @@ class VerificationResourceTest extends TestCase
         $this->assertSame('customer', $result['erasure']['requested_via']);
 
         $expectedBody = json_encode(['reason_code' => 'data_subject_request', 'reason' => 'Asked by email']);
-        $expectedSignature = hash_hmac(
-            'sha256',
-            'DELETE/v1/verifications/ver_123/personal-data'.$expectedBody,
-            'test-secret-key'
-        );
-
-        Http::assertSent(function ($request) use ($expectedBody, $expectedSignature) {
+        Http::assertSent(function ($request) use ($expectedBody) {
             return $request->method() === 'DELETE'
                 && str_contains($request->url(), '/v1/verifications/ver_123/personal-data')
                 && $request->body() === $expectedBody
-                && $request->header('X-HMAC-Signature') === [$expectedSignature];
+                && $request->header('X-HMAC-Signature') === [self::expectedSignature($request, 'DELETE/v1/verifications/ver_123/personal-data'.$expectedBody)];
         });
     }
 
@@ -567,19 +553,13 @@ class VerificationResourceTest extends TestCase
         $client->workspace()->get();
         $client->verifications('ver_123')->blockFace();
 
-        $expectedSignature = hash_hmac(
-            'sha256',
-            'POST/v1/verifications/ver_123/blocked-face',
-            'test-secret-key'
-        );
-
         $blockedFaceRequest = Http::recorded()
             ->map(fn (array $pair) => $pair[0])
             ->first(fn ($request) => str_contains($request->url(), '/v1/verifications/ver_123/blocked-face'));
 
         $this->assertNotNull($blockedFaceRequest);
         $this->assertSame(['test-api-key'], $blockedFaceRequest->header('X-API-Key'));
-        $this->assertSame([$expectedSignature], $blockedFaceRequest->header('X-HMAC-Signature'));
+        $this->assertSame([self::expectedSignature($blockedFaceRequest, 'POST/v1/verifications/ver_123/blocked-face')], $blockedFaceRequest->header('X-HMAC-Signature'));
     }
 
     public function test_block_face_throws_when_no_id(): void

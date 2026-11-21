@@ -340,7 +340,7 @@ class IlluminateHttpClientTest extends TestCase
         parse_str(implode('&', $pairs), $fields);
 
         $path = (string) parse_url($request->url(), PHP_URL_PATH);
-        $expected = hash_hmac('sha256', Signer::canonicalMultipart('POST', $path, $fields, $hashes), 'test-secret-key');
+        $expected = hash_hmac('sha256', Signer::canonicalMultipart('POST', $path, $fields, $hashes, $request->header('X-Timestamp')[0]), 'test-secret-key');
 
         return [$expected, $request->header('X-HMAC-Signature')[0]];
     }

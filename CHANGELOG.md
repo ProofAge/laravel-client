@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.17.0 - 2026-11-21
+
+### Changed
+
+- Requires `proofage/php-sdk` ^0.15.0. Every request now carries `X-Timestamp` and is signed over
+  `{timestamp}.{canonical}`, read and signed again on every retry, so keep the server clock right
+  (the API refuses a timestamp more than 300 seconds off with `TIMESTAMP_OUT_OF_RANGE`, and a repeated
+  signature with `REPLAYED_REQUEST`). A middleware that copies a signed request's headers and re-sends
+  it later must copy `X-Timestamp` with them. See the PHP SDK's 0.15.0 changelog.
+
+### Added
+
+- `ProofAge::verifications()->create($data, $idempotencyKey = null)` and
+  `ProofAge::webhookSubscriptions()->create($data, $idempotencyKey = null)` send an `Idempotency-Key`:
+  your own, or a UUID v4 the SDK generates per call and reuses on its retries. A create that carries one
+  is retried after a timeout or a 5xx without creating twice, and a `409 IDEMPOTENCY_KEY_IN_PROGRESS` is
+  retried after its `Retry-After`. The same key with a different request throws `409 IDEMPOTENCY_KEY_REUSED`.
+
 ## 0.16.0 - 2026-11-19
 
 ### Changed
